@@ -148,6 +148,11 @@
     </div>
 
     <div class="info-bar" id="info-bar">Settings are applied immediately and persist between sessions.</div>
+    <div style="text-align:center; padding: 6px 0 12px;">
+      <button id="btn-check-update" style="font-size:12px; padding:4px 14px; cursor:pointer; border:1px solid var(--border); border-radius:4px; background:var(--surface); color:var(--text);">
+        🔄 Check for Updates
+      </button>
+    </div>
   </div>
 
   <script>
@@ -286,6 +291,10 @@
     }
 
     init().catch(console.error);
+
+    document.getElementById('btn-check-update').addEventListener('click', () => {
+      window.settingsAPI.checkForUpdates();
+    });
   </script>
 </body>
 </html>

@@ -13,4 +13,5 @@ contextBridge.exposeInMainWorld('settingsAPI', {
     get: (key) => ipcRenderer.invoke('settings-get', key),
     getVersion: () => ipcRenderer.invoke('get-version'),
     navigate: (url) => ipcRenderer.invoke('navigate', url),
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
 });

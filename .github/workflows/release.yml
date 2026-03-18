@@ -1,0 +1,96 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  # ── Determine whether this push actually bumps the version ──────────────────
+  # We always build on push to master; the GitHub Release tag is taken from
+  # package.json so re-running on the same version is a no-op (draft will exist).
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            build_flag: --win
+          - os: macos-latest
+            build_flag: --mac
+          - os: ubuntu-latest
+            build_flag: --linux
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check JS syntax
+        run: |
+          node --check src/main.js
+          node --check src/preload.js
+          node --check src/settings/preload.js
+
+      - name: Read version from package.json
+        id: pkg
+        shell: bash
+        run: echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+
+      # macOS: install required tools for code signing (skip if no certs provided)
+      - name: Install macOS dependencies
+        if: matrix.os == 'macos-latest'
+        run: brew install --cask create-dmg || true
+
+      # Linux: install required native libs for electron-builder
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y rpm libarchive-tools
+
+      - name: Build distributable
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS code-signing (optional — set secrets in repo settings to enable)
+          CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+        run: npm run dist -- ${{ matrix.build_flag }} --publish always
+
+  # ── Create a GitHub Release once all platform builds finish ─────────────────
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Read version from package.json
+        id: pkg
+        run: echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.pkg.outputs.version }}
+          name: Electro-XMOJ v${{ steps.pkg.outputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

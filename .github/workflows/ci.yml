@@ -1,0 +1,62 @@
+name: CI — PR Code Check
+
+on:
+  pull_request:
+    branches:
+      - master
+      - main
+
+jobs:
+  check:
+    name: Syntax & Lint Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check JS syntax
+        run: |
+          node --check src/main.js
+          node --check src/preload.js
+          node --check src/settings/preload.js
+          echo "All JS files pass syntax check."
+
+      - name: Validate package.json
+        run: node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package.json is valid JSON');"
+
+      - name: Validate settings HTML
+        run: |
+          node -e "
+          const fs = require('fs');
+          const html = fs.readFileSync('src/settings/index.html', 'utf8');
+          const checks = [
+            ['<!DOCTYPE html>', 'Has DOCTYPE'],
+            ['settingsAPI.getAll', 'Calls settingsAPI.getAll'],
+            ['settingsAPI.set', 'Calls settingsAPI.set'],
+            ['FEATURES', 'Has FEATURES array'],
+          ];
+          let ok = true;
+          checks.forEach(([pat, name]) => {
+            if (!html.includes(pat)) { console.error('FAIL:', name); ok = false; }
+            else console.log('OK:', name);
+          });
+          if (!ok) process.exit(1);
+          "
+
+      - name: Check electron-builder config
+        run: node -e "
+          const pkg = JSON.parse(require('fs').readFileSync('package.json','utf8'));
+          if (!pkg.build) throw new Error('Missing build config');
+          if (!pkg.build.publish) throw new Error('Missing publish config');
+          console.log('electron-builder config OK');
+          "

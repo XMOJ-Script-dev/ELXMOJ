@@ -35,6 +35,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     settingsGet: (key) => ipcRenderer.invoke('settings-get', key),
     /** Navigate the main window to a URL */
     navigate: (url) => ipcRenderer.invoke('navigate', url),
+    /** Trigger a manual check for application updates */
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
 });
 
 // ─── Inject XMOJ enhancement script after DOM is ready ───────────────────────

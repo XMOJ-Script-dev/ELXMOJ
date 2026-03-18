@@ -15,6 +15,7 @@ const {
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { autoUpdater } = require('electron-updater');
 
 // Use dynamic import for the ESM-only electron-store
 let Store;
@@ -80,6 +81,87 @@ let tray = null;
 let settingsWindow = null;
 
 const XMOJ_URL = 'https://www.xmoj.tech/';
+
+// ─── Auto-updater ─────────────────────────────────────────────────────────────
+
+function setupAutoUpdater() {
+    // Don't check for updates during development
+    if (!app.isPackaged) return;
+
+    autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = true;
+
+    autoUpdater.on('checking-for-update', () => {
+        console.log('[Updater] Checking for update…');
+    });
+
+    autoUpdater.on('update-available', (info) => {
+        dialog.showMessageBox(mainWindow, {
+            type: 'info',
+            title: '有新版本可用',
+            message: `Electro-XMOJ ${info.version} 已发布`,
+            detail: `当前版本：${app.getVersion()}\n新版本：${info.version}\n\n是否立即下载？`,
+            buttons: ['下载更新', '稍后提醒'],
+            defaultId: 0,
+            cancelId: 1,
+        }).then(({ response }) => {
+            if (response === 0) {
+                autoUpdater.downloadUpdate();
+            }
+        });
+    });
+
+    autoUpdater.on('update-not-available', () => {
+        console.log('[Updater] Already up to date.');
+    });
+
+    autoUpdater.on('download-progress', (progress) => {
+        const percent = Math.round(progress.percent);
+        mainWindow && mainWindow.setProgressBar(percent / 100);
+        console.log(`[Updater] Download progress: ${percent}%`);
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+        mainWindow && mainWindow.setProgressBar(-1);
+        dialog.showMessageBox(mainWindow, {
+            type: 'info',
+            title: '更新已下载',
+            message: `Electro-XMOJ ${info.version} 已下载完成`,
+            detail: '点击"立即重启"以安装更新，或在下次启动时自动安装。',
+            buttons: ['立即重启', '稍后安装'],
+            defaultId: 0,
+            cancelId: 1,
+        }).then(({ response }) => {
+            if (response === 0) {
+                autoUpdater.quitAndInstall();
+            }
+        });
+    });
+
+    autoUpdater.on('error', (err) => {
+        console.error('[Updater] Error:', err);
+        mainWindow && mainWindow.setProgressBar(-1);
+    });
+
+    // Check for updates 5 seconds after launch, then every 4 hours
+    setTimeout(() => autoUpdater.checkForUpdates(), 5000);
+    setInterval(() => autoUpdater.checkForUpdates(), 4 * 60 * 60 * 1000);
+}
+
+// IPC: manual update check triggered from menu/settings
+ipcMain.handle('check-for-updates', () => {
+    if (!app.isPackaged) {
+        dialog.showMessageBox(mainWindow, {
+            type: 'info',
+            title: '开发模式',
+            message: '自动更新在开发模式下不可用。',
+            buttons: ['OK'],
+        });
+        return;
+    }
+    autoUpdater.checkForUpdates();
+});
+
 
 function createTray() {
     // Use a minimal 16x16 transparent icon as placeholder
@@ -192,6 +274,22 @@ function buildMenu() {
                 {
                     label: 'Report Issue',
                     click: () => { shell.openExternal('https://github.com/XMOJ-Script-dev/Electro-XMOJ/issues'); },
+                },
+                { type: 'separator' },
+                {
+                    label: 'Check for Updates…',
+                    click: () => {
+                        if (!app.isPackaged) {
+                            dialog.showMessageBox(mainWindow, {
+                                type: 'info',
+                                title: '开发模式',
+                                message: '自动更新在开发模式下不可用。',
+                                buttons: ['OK'],
+                            });
+                        } else {
+                            autoUpdater.checkForUpdates();
+                        }
+                    },
                 },
                 { type: 'separator' },
                 {
@@ -375,6 +473,7 @@ app.whenReady().then(async () => {
     buildMenu();
     createTray();
     await createWindow();
+    setupAutoUpdater();
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {

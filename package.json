@@ -5,7 +5,11 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "test": "echo \"No tests configured\" && exit 0"
+    "test": "node --check src/main.js && node --check src/preload.js && node --check src/settings/preload.js && echo All syntax OK",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
   },
   "keywords": [
     "xmoj",
@@ -22,10 +26,54 @@
     "url": "https://github.com/XMOJ-Script-dev/Electro-XMOJ/issues"
   },
   "homepage": "https://github.com/XMOJ-Script-dev/Electro-XMOJ#readme",
+  "build": {
+    "appId": "tech.xmoj.electro-xmoj",
+    "productName": "Electro-XMOJ",
+    "copyright": "Copyright © XMOJ-Script-dev",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "XMOJ-Script-dev",
+        "repo": "Electro-XMOJ"
+      }
+    ],
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["x64", "arm64"] }
+      ],
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.education"
+    },
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.png",
+      "category": "Education"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
   "devDependencies": {
-    "electron": "^36.9.5"
+    "electron": "^36.9.5",
+    "electron-builder": "^26.8.1"
   },
   "dependencies": {
-    "electron-store": "^10.0.1"
+    "electron-store": "^10.0.1",
+    "electron-updater": "^6.8.3"
   }
 }

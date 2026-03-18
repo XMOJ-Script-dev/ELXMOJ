@@ -1,0 +1,31 @@
+{
+  "name": "electro-xmoj",
+  "version": "1.0.0",
+  "description": "XMOJ desktop application built with Electron",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"No tests configured\" && exit 0"
+  },
+  "keywords": [
+    "xmoj",
+    "electron",
+    "oj"
+  ],
+  "author": "XMOJ-Script-dev",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/XMOJ-Script-dev/Electro-XMOJ.git"
+  },
+  "bugs": {
+    "url": "https://github.com/XMOJ-Script-dev/Electro-XMOJ/issues"
+  },
+  "homepage": "https://github.com/XMOJ-Script-dev/Electro-XMOJ#readme",
+  "devDependencies": {
+    "electron": "^36.9.5"
+  },
+  "dependencies": {
+    "electron-store": "^10.0.1"
+  }
+}

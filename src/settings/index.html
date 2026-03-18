@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Electro-XMOJ Settings</title>
+  <style>
+    :root {
+      --bg: #f9f9f9;
+      --surface: #ffffff;
+      --border: #ddd;
+      --text: #222;
+      --text-secondary: #555;
+      --accent: #0366d6;
+      --success: #28a745;
+      --warning: #e6a817;
+      --danger: #dc3545;
+      --header-bg: #24292e;
+      --header-text: #fff;
+      --radius: 6px;
+      --shadow: 0 1px 3px rgba(0,0,0,.12);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1a1a;
+        --surface: #252526;
+        --border: #444;
+        --text: #e0e0e0;
+        --text-secondary: #aaa;
+        --header-bg: #1e1e1e;
+        --header-text: #e0e0e0;
+      }
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    header h1 { font-size: 16px; font-weight: 600; }
+    header span { font-size: 12px; opacity: .7; }
+    .body { padding: 16px 20px; overflow-y: auto; height: calc(100vh - 50px); }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 14px;
+    }
+    .card-header {
+      padding: 8px 14px;
+      background: var(--header-bg);
+      color: var(--header-text);
+      font-weight: 600;
+      font-size: 13px;
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+    .card-body { padding: 0; }
+    ul.feature-list { list-style: none; }
+    ul.feature-list > li { border-bottom: 1px solid var(--border); }
+    ul.feature-list > li:last-child { border-bottom: none; }
+    .feature-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 14px;
+      gap: 10px;
+    }
+    .feature-item label {
+      flex: 1;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .feature-item input[type="checkbox"] {
+      width: 16px; height: 16px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .feature-item select {
+      padding: 2px 6px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 12px;
+    }
+    .badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .badge-add  { background:#d4edda; color:#155724; }
+    .badge-mod  { background:#fff3cd; color:#856404; }
+    .badge-del  { background:#f8d7da; color:#721c24; }
+    /* Nested list indented */
+    ul.feature-list ul.feature-list > li { padding-left: 20px; }
+    .footer-note {
+      font-size: 11px;
+      color: var(--text-secondary);
+      padding: 6px 14px 10px;
+    }
+    .legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    .legend span { display: flex; align-items: center; gap: 4px; }
+    h2 { font-size: 14px; margin-bottom: 8px; color: var(--text-secondary); font-weight: 500; }
+    .info-bar {
+      font-size: 11px;
+      color: var(--text-secondary);
+      text-align: center;
+      padding: 8px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>⚙️ Electro-XMOJ Settings</h1>
+    <span id="version-badge"></span>
+  </header>
+  <div class="body">
+    <div class="legend">
+      <span><span class="badge badge-add">+</span> Add function</span>
+      <span><span class="badge badge-mod">~</span> Modify function</span>
+      <span><span class="badge badge-del">-</span> Remove element</span>
+    </div>
+
+    <div class="card">
+      <div class="card-header">XMOJ Enhancement Features</div>
+      <div class="card-body">
+        <ul class="feature-list" id="feature-list"></ul>
+        <p class="footer-note">* Not recommended to disable — may cause instability or missing features</p>
+      </div>
+    </div>
+
+    <div class="info-bar" id="info-bar">Settings are applied immediately and persist between sessions.</div>
+  </div>
+
+  <script>
+    // Feature tree mirrors the XMOJ-Script settings panel
+    const FEATURES = [
+      { id: 'Discussion',        type: 'F', name: '恢复讨论与短消息功能  (Restore Discussion & Messages)' },
+      { id: 'MoreSTD',           type: 'F', name: '查看到更多标程  (View more model solutions)' },
+      { id: 'ApplyData',         type: 'A', name: '获取数据功能  (Get test data)' },
+      { id: 'AutoCheat',         type: 'A', name: '自动提交当年代码  (Auto-submit historical code)' },
+      { id: 'Rating',            type: 'A', name: '添加用户评分和用户名颜色  (User rating & colored usernames)' },
+      { id: 'AutoRefresh',       type: 'A', name: '比赛列表、比赛排名界面自动刷新  (Auto-refresh contest list & ranklist)' },
+      { id: 'AutoCountdown',     type: 'A', name: '比赛列表等界面的时间自动倒计时  (Auto-countdown timers)' },
+      { id: 'DownloadPlayback',  type: 'A', name: '回放视频增加下载功能  (Download replay videos)' },
+      { id: 'ImproveACRate',     type: 'A', name: '自动提交已AC题目以提高AC率  (Auto-submit AC problems to improve AC rate)' },
+      { id: 'AutoO2',            type: 'F', name: '代码提交界面自动选择O2优化  (Auto-enable O2 optimization on submit)' },
+      {
+        id: 'Beautify', type: 'F', name: '美化界面  (Beautify UI)', children: [
+          { id: 'NewTopBar',     type: 'F', name: '使用新的顶部导航栏  (New top navigation bar)' },
+          { id: 'NewBootstrap',  type: 'F', name: '使用新版Bootstrap样式库  (New Bootstrap theme)*' },
+          { id: 'ResetType',     type: 'F', name: '重新排版  (Re-layout)*' },
+          { id: 'AddColorText',  type: 'A', name: '增加彩色文字  (Coloured verdict text)' },
+          { id: 'AddUnits',      type: 'A', name: '状态界面内存与耗时添加单位  (Add units to memory & time on status page)' },
+          { id: 'Theme',         type: 'A', name: '界面主题  (UI theme)', select: [['light','亮色 Light'], ['dark','暗色 Dark'], ['auto','跟随系统 Auto']] },
+          { id: 'AddAnimation',  type: 'A', name: '增加动画  (Add animations)' },
+          { id: 'ReplaceYN',     type: 'F', name: '题目前状态提示替换为好看的图标  (Replace Y/N icons with nicer symbols)' },
+          { id: 'RemoveAlerts',  type: 'D', name: '去除多余反复的提示  (Remove redundant alerts)' },
+          { id: 'Translate',     type: 'F', name: '统一使用中文，翻译了部分英文  (Translate English text to Chinese)*' },
+          { id: 'ReplaceLinks',  type: 'F', name: '将网站中所有以方括号包装的链接替换为按钮  (Replace [link] with buttons)' },
+          { id: 'RemoveUseless', type: 'D', name: '删去无法使用的功能  (Remove non-functional elements)*' },
+          { id: 'ReplaceXM',     type: 'F', name: '将"小明"替换为"高老师"，"小红"替换为"徐师娘"等  (Replace character names)' },
+          { id: 'MonochromeUI',  type: 'F', name: '极简黑白界面风格  (Minimalist monochrome UI)' },
+        ]
+      },
+      { id: 'AutoLogin',         type: 'A', name: '在需要登录的界面自动跳转到登录界面  (Auto-redirect to login when required)' },
+      { id: 'SavePassword',      type: 'A', name: '自动保存用户名与密码  (Save username & password)' },
+      { id: 'CopySamples',       type: 'F', name: '题目界面测试样例复制修复  (Fix sample copy button)' },
+      { id: 'RefreshSolution',   type: 'F', name: '状态页面结果自动刷新  (Auto-refresh submission results)' },
+      { id: 'CopyMD',            type: 'A', name: '复制题目或题解内容  (Copy problem / solution as Markdown)' },
+      { id: 'ProblemSwitcher',   type: 'A', name: '比赛题目切换器  (Contest problem switcher sidebar)' },
+      { id: 'OpenAllProblem',    type: 'A', name: '比赛题目界面一键打开所有题目  (Open all contest problems at once)' },
+      {
+        id: 'CheckCode', type: 'A', name: '提交代码前对代码进行检查  (Check code before submitting)', children: [
+          { id: 'IOFile',        type: 'A', name: '检查是否使用了文件输入输出  (Check for file I/O)' },
+          { id: 'CompileError',  type: 'A', name: '检查是否有编译错误  (Check for compile errors)' },
+        ]
+      },
+      { id: 'ExportACCode',      type: 'F', name: '导出AC代码，每题一个文件  (Export AC code, one file per problem)' },
+      { id: 'LoginFailed',       type: 'F', name: '修复登录后跳转失败  (Fix post-login redirect)*' },
+      { id: 'NewDownload',       type: 'A', name: '下载页面增加下载内容  (More content on downloads page)' },
+      { id: 'CompareSource',     type: 'A', name: '比较代码  (Compare source code)' },
+      { id: 'BBSPopup',          type: 'A', name: '讨论提醒  (Discussion forum notifications)' },
+      { id: 'MessagePopup',      type: 'A', name: '短消息提醒  (Private message notifications)' },
+      { id: 'DebugMode',         type: 'A', name: '调试模式  (Debug mode — for developers only)' },
+      { id: 'SuperDebug',        type: 'A', name: '本地调试模式  (Local debug mode — authorised developers only)' },
+    ];
+
+    const TYPE_MAP = {
+      A: { cls: 'badge-add',  label: '+' },
+      F: { cls: 'badge-mod',  label: '~' },
+      D: { cls: 'badge-del',  label: '-' },
+    };
+
+    let allSettings = {};
+
+    function buildItem(feat, ul) {
+      const li = document.createElement('li');
+      const item = document.createElement('div');
+      item.className = 'feature-item';
+
+      const badge = document.createElement('span');
+      const t = TYPE_MAP[feat.type] || TYPE_MAP['A'];
+      badge.className = 'badge ' + t.cls;
+      badge.textContent = t.label;
+      item.appendChild(badge);
+
+      const label = document.createElement('label');
+      label.textContent = feat.name;
+      label.htmlFor = 'setting-' + feat.id;
+
+      if (feat.select) {
+        // Theme selector
+        item.appendChild(label);
+        const sel = document.createElement('select');
+        sel.id = 'setting-' + feat.id;
+        feat.select.forEach(([val, text]) => {
+          const opt = document.createElement('option');
+          opt.value = val;
+          opt.textContent = text;
+          sel.appendChild(opt);
+        });
+        const current = allSettings[feat.id];
+        sel.value = (current !== undefined && current !== null) ? current : 'auto';
+        sel.addEventListener('change', () => {
+          window.settingsAPI.set(feat.id, sel.value);
+          allSettings[feat.id] = sel.value;
+        });
+        item.appendChild(sel);
+      } else if (feat.children) {
+        // Group header (no checkbox)
+        item.appendChild(label);
+      } else {
+        // Toggle checkbox
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.id = 'setting-' + feat.id;
+        const stored = allSettings[feat.id];
+        cb.checked = stored !== undefined ? (stored === true || stored === 'true') : true;
+        cb.addEventListener('change', () => {
+          window.settingsAPI.set(feat.id, cb.checked);
+          allSettings[feat.id] = cb.checked;
+        });
+        item.appendChild(cb);
+        item.appendChild(label);
+      }
+
+      li.appendChild(item);
+
+      if (feat.children && feat.children.length) {
+        const childUl = document.createElement('ul');
+        childUl.className = 'feature-list';
+        feat.children.forEach(child => buildItem(child, childUl));
+        li.appendChild(childUl);
+      }
+
+      ul.appendChild(li);
+    }
+
+    async function init() {
+      allSettings = await window.settingsAPI.getAll() || {};
+
+      const version = await window.settingsAPI.getVersion();
+      document.getElementById('version-badge').textContent = 'v' + version;
+
+      const ul = document.getElementById('feature-list');
+      FEATURES.forEach(feat => buildItem(feat, ul));
+    }
+
+    init().catch(console.error);
+  </script>
+</body>
+</html>

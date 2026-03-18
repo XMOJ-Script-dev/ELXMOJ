@@ -99,7 +99,7 @@ function setupAutoUpdater() {
         dialog.showMessageBox(mainWindow, {
             type: 'info',
             title: '有新版本可用',
-            message: `Electro-XMOJ ${info.version} 已发布`,
+            message: `小明的OJ ${info.version} 已发布`,
             detail: `当前版本：${app.getVersion()}\n新版本：${info.version}\n\n是否立即下载？`,
             buttons: ['下载更新', '稍后提醒'],
             defaultId: 0,
@@ -126,7 +126,7 @@ function setupAutoUpdater() {
         dialog.showMessageBox(mainWindow, {
             type: 'info',
             title: '更新已下载',
-            message: `Electro-XMOJ ${info.version} 已下载完成`,
+            message: `小明的OJ ${info.version} 已下载完成`,
             detail: '点击"立即重启"以安装更新，或在下次启动时自动安装。',
             buttons: ['立即重启', '稍后安装'],
             defaultId: 0,
@@ -168,12 +168,12 @@ function createTray() {
     const icon = nativeImage.createEmpty();
     tray = new Tray(icon);
     const contextMenu = Menu.buildFromTemplate([
-        { label: 'Show XMOJ', click: () => { mainWindow && mainWindow.show(); } },
-        { label: 'Settings', click: openSettingsWindow },
+        { label: '显示 小明的OJ', click: () => { mainWindow && mainWindow.show(); } },
+        { label: '设置', click: openSettingsWindow },
         { type: 'separator' },
-        { label: 'Quit', click: () => app.quit() },
+        { label: '退出', click: () => app.quit() },
     ]);
-    tray.setToolTip('Electro-XMOJ');
+    tray.setToolTip('小明的OJ');
     tray.setContextMenu(contextMenu);
     tray.on('double-click', () => { mainWindow && mainWindow.show(); });
 }
@@ -181,110 +181,110 @@ function createTray() {
 function buildMenu() {
     const template = [
         {
-            label: 'File',
+            label: '文件',
             submenu: [
                 {
-                    label: 'Home',
+                    label: '主页',
                     accelerator: 'CmdOrCtrl+H',
                     click: () => { mainWindow && mainWindow.loadURL(XMOJ_URL); },
                 },
                 { type: 'separator' },
                 {
-                    label: 'Settings',
+                    label: '设置',
                     accelerator: 'CmdOrCtrl+,',
                     click: openSettingsWindow,
                 },
                 { type: 'separator' },
-                { role: 'quit' },
+                { label: '退出', role: 'quit' },
             ],
         },
         {
-            label: 'Edit',
+            label: '编辑',
             submenu: [
-                { role: 'undo' },
-                { role: 'redo' },
+                { label: '撤销', role: 'undo' },
+                { label: '重做', role: 'redo' },
                 { type: 'separator' },
-                { role: 'cut' },
-                { role: 'copy' },
-                { role: 'paste' },
-                { role: 'selectAll' },
+                { label: '剪切', role: 'cut' },
+                { label: '复制', role: 'copy' },
+                { label: '粘贴', role: 'paste' },
+                { label: '全选', role: 'selectAll' },
             ],
         },
         {
-            label: 'View',
+            label: '视图',
             submenu: [
-                { role: 'reload' },
-                { role: 'forceReload' },
-                { role: 'toggleDevTools' },
+                { label: '刷新', role: 'reload' },
+                { label: '强制刷新', role: 'forceReload' },
+                { label: '开发者工具', role: 'toggleDevTools' },
                 { type: 'separator' },
-                { role: 'resetZoom' },
-                { role: 'zoomIn' },
-                { role: 'zoomOut' },
+                { label: '重置缩放', role: 'resetZoom' },
+                { label: '放大', role: 'zoomIn' },
+                { label: '缩小', role: 'zoomOut' },
                 { type: 'separator' },
-                { role: 'togglefullscreen' },
+                { label: '全屏', role: 'togglefullscreen' },
             ],
         },
         {
-            label: 'Navigate',
+            label: '导航',
             submenu: [
                 {
-                    label: 'Back',
+                    label: '后退',
                     accelerator: 'Alt+Left',
                     click: () => { mainWindow && mainWindow.webContents.goBack(); },
                 },
                 {
-                    label: 'Forward',
+                    label: '前进',
                     accelerator: 'Alt+Right',
                     click: () => { mainWindow && mainWindow.webContents.goForward(); },
                 },
                 { type: 'separator' },
                 {
-                    label: 'Problem Set',
+                    label: '题库',
                     click: () => { mainWindow && mainWindow.loadURL('https://www.xmoj.tech/problemset.php'); },
                 },
                 {
-                    label: 'Status',
+                    label: '提交记录',
                     click: () => { mainWindow && mainWindow.loadURL('https://www.xmoj.tech/status.php'); },
                 },
                 {
-                    label: 'Contests',
+                    label: '比赛',
                     click: () => { mainWindow && mainWindow.loadURL('https://www.xmoj.tech/contest.php'); },
                 },
                 {
-                    label: 'Discussion',
+                    label: '讨论',
                     click: () => { mainWindow && mainWindow.loadURL('https://www.xmoj.tech/discuss3/discuss.php'); },
                 },
                 {
-                    label: 'Downloads',
+                    label: '下载',
                     click: () => { mainWindow && mainWindow.loadURL('https://www.xmoj.tech/downloads.php'); },
                 },
             ],
         },
         {
-            label: 'Help',
+            label: '帮助',
             submenu: [
                 {
-                    label: 'XMOJ-Script GitHub',
+                    label: 'XMOJ-Script 源码',
                     click: () => { shell.openExternal('https://github.com/XMOJ-Script-dev/XMOJ-Script'); },
                 },
                 {
-                    label: 'Electro-XMOJ GitHub',
-                    click: () => { shell.openExternal('https://github.com/XMOJ-Script-dev/Electro-XMOJ'); },
+                    label: 'ELXMOJ 源码',
+                    click: () => { shell.openExternal('https://github.com/XMOJ-Script-dev/ELXMOJ'); },
                 },
                 {
-                    label: 'Report Issue',
-                    click: () => { shell.openExternal('https://github.com/XMOJ-Script-dev/Electro-XMOJ/issues'); },
+                    label: '反馈问题',
+                    click: () => { shell.openExternal('https://github.com/XMOJ-Script-dev/ELXMOJ/issues'); },
                 },
                 { type: 'separator' },
                 {
-                    label: 'Check for Updates…',
+                    label: '检查更新…',
                     click: () => {
                         if (!app.isPackaged) {
                             dialog.showMessageBox(mainWindow, {
                                 type: 'info',
                                 title: '开发模式',
                                 message: '自动更新在开发模式下不可用。',
-                                buttons: ['OK'],
+                                buttons: ['确定'],
                             });
                         } else {
                             autoUpdater.checkForUpdates();
@@ -293,14 +293,14 @@ function buildMenu() {
                 },
                 { type: 'separator' },
                 {
-                    label: `About Electro-XMOJ`,
+                    label: '关于 小明的OJ',
                     click: () => {
                         dialog.showMessageBox(mainWindow, {
                             type: 'info',
-                            title: 'About Electro-XMOJ',
-                            message: 'Electro-XMOJ',
-                            detail: `Version: ${app.getVersion()}\nElectron: ${process.versions.electron}\nNode: ${process.versions.node}\n\nXMOJ desktop application powered by Electron.\nBased on XMOJ-Script by XMOJ-Script-dev.`,
-                            buttons: ['OK'],
+                            title: '关于 小明的OJ',
+                            message: '小明的OJ (ELXMOJ)',
+                            detail: `版本：${app.getVersion()}\nElectron：${process.versions.electron}\nNode.js：${process.versions.node}\n\n小明的OJ 桌面客户端，由 Electron 驱动。\n基于 XMOJ-Script，由 XMOJ-Script-dev 团队开发。`,
+                            buttons: ['确定'],
                         });
                     },
                 },
@@ -321,14 +321,13 @@ async function createWindow() {
         height: bounds.height,
         minWidth: 800,
         minHeight: 600,
-        title: 'Electro-XMOJ',
+        title: '小明的OJ',
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
             nodeIntegration: false,
-            // Allow running content scripts that access cross-origin resources
             webSecurity: true,
-                  spellcheck: false,
+            spellcheck: false,
         },
         show: false,
     });
@@ -352,7 +351,7 @@ async function createWindow() {
 
     // Update title with page title
     mainWindow.webContents.on('page-title-updated', (event, title) => {
-        mainWindow.setTitle(title ? `${title} — Electro-XMOJ` : 'Electro-XMOJ');
+        mainWindow.setTitle(title ? `${title} — 小明的OJ` : '小明的OJ');
     });
 
     // Open external links in the system browser
@@ -388,7 +387,7 @@ function openSettingsWindow() {
     settingsWindow = new BrowserWindow({
         width: 700,
         height: 620,
-        title: 'Electro-XMOJ Settings',
+        title: '小明的OJ — 设置',
         parent: mainWindow || undefined,
         modal: false,
         resizable: true,

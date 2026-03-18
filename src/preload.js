@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Electro-XMOJ Preload Script
+ * ELXMOJ Preload Script
  *
  * This script runs in a privileged context and:
  *  1. Exposes an `electronAPI` object to the page via contextBridge.
@@ -65,10 +65,10 @@ function buildGMShim() {
         script: {
             name: 'XMOJ',
             version: '3.3.0',
-            description: 'XMOJ增强脚本 (Electro-XMOJ)',
+            description: 'XMOJ增强脚本 (ELXMOJ)',
             author: '@XMOJ-Script-dev, @langningchen and the community',
         },
-        scriptHandler: 'Electro-XMOJ',
+        scriptHandler: 'ELXMOJ',
         version: '1.0.0',
     };
 
@@ -186,13 +186,13 @@ function buildGMShim() {
     window._gmMenuCommands = window._gmMenuCommands || [];
     window.GM_registerMenuCommand = (name, fn, _accessKey) => {
         window._gmMenuCommands.push({ name, fn });
-        console.log('[Electro-XMOJ] Registered menu command:', name);
+        console.log('[ELXMOJ] Registered menu command:', name);
     };
 
     // ── unsafeWindow ──────────────────────────────────────────────────────
     window.unsafeWindow = window;
 
-    console.log('[Electro-XMOJ] GM shim loaded');
+    console.log('[ELXMOJ] GM shim loaded');
 })();
     `;
 }
@@ -220,19 +220,19 @@ async function injectXMOJScript() {
             try { sessionStorage.setItem(CACHE_KEY, scriptText); } catch (_) {}
         }
     } catch (e) {
-        console.warn('[Electro-XMOJ] Failed to fetch XMOJ script from network:', e.message);
+        console.warn('[ELXMOJ] Failed to fetch XMOJ script from network:', e.message);
     }
 
     // Fall back to session cache
     if (!scriptText) {
         try { scriptText = sessionStorage.getItem(CACHE_KEY); } catch (_) {}
         if (scriptText) {
-            console.log('[Electro-XMOJ] Using cached XMOJ script');
+            console.log('[ELXMOJ] Using cached XMOJ script');
         }
     }
 
     if (!scriptText) {
-        console.error('[Electro-XMOJ] Could not load XMOJ enhancement script');
+        console.error('[ELXMOJ] Could not load XMOJ enhancement script');
         return;
     }
 

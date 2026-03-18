@@ -6,6 +6,11 @@ on:
       - master
       - main
 
+# Workflow-level default: read-only.
+# Each job that needs more declares it explicitly.
+permissions:
+  contents: read
+
 jobs:
   # ── Determine whether this push actually bumps the version ──────────────────
   # We always build on push to master; the GitHub Release tag is taken from
@@ -13,6 +18,9 @@ jobs:
   build:
     name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # Needs write access to upload build artifacts to GitHub Releases
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -88,7 +96,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.pkg.outputs.version }}
-          name: Electro-XMOJ v${{ steps.pkg.outputs.version }}
+          name: 小明的OJ v${{ steps.pkg.outputs.version }}
           draft: false
           prerelease: false
           generate_release_notes: true

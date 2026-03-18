@@ -6,10 +6,18 @@ on:
       - master
       - main
 
+# Minimal permissions — only what is needed to check out code and run tests.
+# Explicitly declared so org-level "restrictive default" policies are satisfied.
+permissions:
+  contents: read
+
 jobs:
   check:
     name: Syntax & Lint Check
     runs-on: ubuntu-latest
+    # Job-level permissions (inherits workflow default — contents: read is enough)
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code

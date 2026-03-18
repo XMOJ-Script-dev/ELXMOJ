@@ -1,7 +1,7 @@
 {
-  "name": "electro-xmoj",
+  "name": "elxmoj",
   "version": "1.0.0",
-  "description": "XMOJ desktop application built with Electron",
+  "description": "小明的OJ — XMOJ 桌面客户端 (ELXMOJ desktop application built with Electron)",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
@@ -13,6 +13,7 @@
   },
   "keywords": [
     "xmoj",
+    "elxmoj",
     "electron",
     "oj"
   ],
@@ -20,21 +21,21 @@
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/XMOJ-Script-dev/Electro-XMOJ.git"
+    "url": "git+https://github.com/XMOJ-Script-dev/ELXMOJ.git"
   },
   "bugs": {
-    "url": "https://github.com/XMOJ-Script-dev/Electro-XMOJ/issues"
+    "url": "https://github.com/XMOJ-Script-dev/ELXMOJ/issues"
   },
-  "homepage": "https://github.com/XMOJ-Script-dev/Electro-XMOJ#readme",
+  "homepage": "https://github.com/XMOJ-Script-dev/ELXMOJ#readme",
   "build": {
-    "appId": "tech.xmoj.electro-xmoj",
-    "productName": "Electro-XMOJ",
+    "appId": "tech.xmoj.elxmoj",
+    "productName": "小明的OJ",
     "copyright": "Copyright © XMOJ-Script-dev",
     "publish": [
       {
         "provider": "github",
         "owner": "XMOJ-Script-dev",
-        "repo": "Electro-XMOJ"
+        "repo": "ELXMOJ"
       }
     ],
     "files": [

@@ -3,10 +3,13 @@
 /**
  * ELXMOJ Preload Script
  *
- * This script runs in a privileged context and:
- *  1. Exposes an `electronAPI` object to the page via contextBridge.
- *  2. Injects a compatibility shim for the GM_* / GM.* Greasemonkey APIs.
- *  3. Fetches and injects the latest XMOJ.user.js enhancement script from GitHub.
+ * Runs in an isolated privileged context and:
+ *  1. Exposes `electronAPI` to the renderer via contextBridge.
+ *  2. Syncs electron-store settings → page localStorage BEFORE the script runs,
+ *     so the XMOJ script always starts with the user's saved preferences.
+ *  3. Injects a Greasemonkey API (GM_*) compatibility shim.
+ *  4. Loads the XMOJ enhancement script from the local disk cache (fast launch),
+ *     then checks for a newer version in the background and prompts the user.
  */
 
 const { contextBridge, ipcRenderer } = require('electron');
@@ -35,20 +38,51 @@ contextBridge.exposeInMainWorld('electronAPI', {
     settingsGet: (key) => ipcRenderer.invoke('settings-get', key),
     /** Navigate the main window to a URL */
     navigate: (url) => ipcRenderer.invoke('navigate', url),
-    /** Trigger a manual check for application updates */
+    /** Trigger a manual check for application (Electron) updates */
     checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+    /** Read the cached XMOJ script from disk */
+    scriptCacheRead: (channel) => ipcRenderer.invoke('script-cache-read', channel),
+    /** Write a new XMOJ script version to the disk cache */
+    scriptCacheWrite: (channel, script, version) =>
+        ipcRenderer.invoke('script-cache-write', channel, script, version),
+    /** Show the native "new script version available" dialog */
+    showScriptUpdateDialog: (opts) => ipcRenderer.invoke('show-script-update-dialog', opts),
 });
 
-// ─── Inject XMOJ enhancement script after DOM is ready ───────────────────────
-window.addEventListener('DOMContentLoaded', () => {
+// sessionStorage key used to ensure the background update check runs at most
+// once per browser session (survives page navigations but not app restarts).
+const UPDATE_CHECK_SESSION_KEY = 'elxmoj-script-update-checked';
+
+// ─── Main injection entry point ───────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+    // 1. Write all persisted settings into localStorage BEFORE the script runs.
+    await syncSettingsToLocalStorage();
+    // 2. Inject the Greasemonkey API shim into the page context.
     injectGMShim();
-    injectXMOJScript();
+    // 3. Load the XMOJ script from disk cache (or network if no cache yet).
+    await injectXMOJScript();
 });
 
+// ─── Settings sync ────────────────────────────────────────────────────────────
 /**
- * Inject a Greasemonkey / Tampermonkey compatibility shim so that the
- * unmodified XMOJ.user.js can run inside Electron without a userscript manager.
+ * Read every setting from electron-store and write it into the page's
+ * localStorage as `UserScript-Setting-<key>` so the XMOJ script picks them
+ * up on first access instead of falling back to hardcoded defaults.
  */
+async function syncSettingsToLocalStorage() {
+    try {
+        const settings = await ipcRenderer.invoke('settings-get-all');
+        if (!settings || typeof settings !== 'object') return;
+        for (const [key, value] of Object.entries(settings)) {
+            // XMOJ script reads these as raw strings.
+            localStorage.setItem('UserScript-Setting-' + key, String(value));
+        }
+    } catch (e) {
+        console.warn('[ELXMOJ] Failed to sync settings to localStorage:', e.message);
+    }
+}
+
+// ─── GM shim ──────────────────────────────────────────────────────────────────
 function injectGMShim() {
     const script = document.createElement('script');
     script.textContent = buildGMShim();
@@ -73,8 +107,6 @@ function buildGMShim() {
     };
 
     // ── GM_setValue / GM_getValue ─────────────────────────────────────────
-    // The XMOJ script already uses localStorage for most settings, but we
-    // provide these shims in case they are called directly.
     window.GM_setValue = (key, value) => {
         try { localStorage.setItem('GM_' + key, JSON.stringify(value)); } catch (e) { console.warn('GM_setValue error', e); }
     };
@@ -100,8 +132,6 @@ function buildGMShim() {
     };
 
     // ── GM_xmlhttpRequest ─────────────────────────────────────────────────
-    // Replace with the native fetch API. Electron relaxes CORS for the
-    // renderer process so cross-origin requests work without special grants.
     window.GM_xmlhttpRequest = (details) => {
         const controller = new AbortController();
         const { signal } = controller;
@@ -111,12 +141,10 @@ function buildGMShim() {
             Object.assign(headers, details.headers);
         }
 
-        let bodyData = details.data || undefined;
-
         fetch(details.url, {
             method: (details.method || 'GET').toUpperCase(),
             headers,
-            body: bodyData,
+            body: details.data || undefined,
             signal,
             credentials: 'include',
         })
@@ -142,7 +170,6 @@ function buildGMShim() {
     };
 
     // ── GM.cookie ─────────────────────────────────────────────────────────
-    // The XMOJ script uses GM.cookie.set() to reset PHPSESSID when missing.
     const gmCookie = {
         get: (filter, callback) => {
             if (window.electronAPI) {
@@ -155,16 +182,14 @@ function buildGMShim() {
         },
         set: (details) => {
             if (window.electronAPI) {
-                // Build a proper cookie details object for Electron
-                const cookieDetails = {
+                return window.electronAPI.cookiesSet({
                     url: 'https://www.xmoj.tech',
                     name: details.name || '',
                     value: details.value || '',
                     path: details.path || '/',
                     secure: false,
                     httpOnly: false,
-                };
-                return window.electronAPI.cookiesSet(cookieDetails);
+                });
             }
             return Promise.resolve();
         },
@@ -181,8 +206,6 @@ function buildGMShim() {
     window.GM.cookie = gmCookie;
 
     // ── GM_registerMenuCommand ────────────────────────────────────────────
-    // In Electron the native application menu is built in main.js.
-    // Commands registered here are stored and logged for diagnostics.
     window._gmMenuCommands = window._gmMenuCommands || [];
     window.GM_registerMenuCommand = (name, fn, _accessKey) => {
         window._gmMenuCommands.push({ name, fn });
@@ -197,61 +220,144 @@ function buildGMShim() {
     `;
 }
 
+// ─── Script channel helpers ───────────────────────────────────────────────────
 /**
- * Fetch and inject the XMOJ enhancement userscript.
- * We attempt to load the latest version from GitHub; if that fails we fall
- * back to the cached version stored in sessionStorage.
+ * Determine the download channel ('prod' or 'dev') from the DebugMode setting.
+ * syncSettingsToLocalStorage() has already run at this point, so localStorage
+ * holds the electron-store value.
  */
-async function injectXMOJScript() {
-    const SCRIPT_URL =
-        'https://raw.githubusercontent.com/XMOJ-Script-dev/XMOJ-Script/master/XMOJ.user.js';
-    const CACHE_KEY = 'electro-xmoj-script-cache';
+function getScriptChannel() {
+    return localStorage.getItem('UserScript-Setting-DebugMode') === 'true' ? 'dev' : 'prod';
+}
 
-    let scriptText = null;
+function getScriptUrl(channel) {
+    return channel === 'dev'
+        ? 'https://dev.xmoj-bbs.me/XMOJ.user.js'
+        : 'https://xmoj-bbs.me/XMOJ.user.js';
+}
 
-    // Try network first
-    try {
-        const response = await fetch(SCRIPT_URL);
-        if (response.ok) {
-            scriptText = await response.text();
-            // Strip the userscript header (==UserScript== ... ==/UserScript==)
-            scriptText = stripUserScriptHeader(scriptText);
-            // Cache it for offline use
-            try { sessionStorage.setItem(CACHE_KEY, scriptText); } catch (_) {}
-        }
-    } catch (e) {
-        console.warn('[ELXMOJ] Failed to fetch XMOJ script from network:', e.message);
-    }
-
-    // Fall back to session cache
-    if (!scriptText) {
-        try { scriptText = sessionStorage.getItem(CACHE_KEY); } catch (_) {}
-        if (scriptText) {
-            console.log('[ELXMOJ] Using cached XMOJ script');
-        }
-    }
-
-    if (!scriptText) {
-        console.error('[ELXMOJ] Could not load XMOJ enhancement script');
-        return;
-    }
-
-    const script = document.createElement('script');
-    script.textContent = scriptText;
-    (document.head || document.documentElement).appendChild(script);
+// ─── Version helpers ──────────────────────────────────────────────────────────
+/** Extract the @version value from a userscript header. */
+function parseScriptVersion(text) {
+    const m = text.match(/\/\/\s*@version\s+(\S+)/);
+    return m ? m[1].trim() : null;
 }
 
 /**
- * Remove the ==UserScript== metadata block from a Greasemonkey script so
- * it can be safely injected as a plain <script> tag.
+ * Return true if semver string `b` is strictly newer than `a`.
+ * If `a` is absent (no cached version), any `b` is considered newer.
+ */
+function isNewer(a, b) {
+    if (!a) return !!b;
+    if (!b) return false;
+    const nums = (v) => v.split('.').map((n) => parseInt(n, 10) || 0);
+    const [ap, bp] = [nums(a), nums(b)];
+    const len = Math.max(ap.length, bp.length);
+    for (let i = 0; i < len; i++) {
+        if ((bp[i] || 0) > (ap[i] || 0)) return true;
+        if ((bp[i] || 0) < (ap[i] || 0)) return false;
+    }
+    return false;
+}
+
+// ─── Script injection ─────────────────────────────────────────────────────────
+/** Append a <script> tag with the given source text to the document. */
+function injectScriptText(scriptText) {
+    const el = document.createElement('script');
+    el.textContent = scriptText;
+    (document.head || document.documentElement).appendChild(el);
+}
+
+/**
+ * Remove the ==UserScript== / ==/UserScript== metadata block so the
+ * remaining code can be injected as a plain <script> tag.
  */
 function stripUserScriptHeader(text) {
-    const startMarker = '// ==UserScript==';
-    const endMarker = '// ==/UserScript==';
-    const start = text.indexOf(startMarker);
-    const end = text.indexOf(endMarker);
-    if (start !== -1 && end !== -1) {
-        return text.slice(end + endMarker.length);
-    }
+    const end = text.indexOf('// ==/UserScript==');
+    if (end !== -1) return text.slice(end + '// ==/UserScript=='.length);
     return text;
+}
+
+/**
+ * Main script loading function (cache-first strategy):
+ *
+ *  • If a disk-cached copy exists → inject it immediately (no network wait),
+ *    then background-check for a newer version once per session.
+ *  • If no cache exists → fetch from xmoj-bbs.me, save to disk, then inject.
+ */
+async function injectXMOJScript() {
+    const channel = getScriptChannel();
+    const scriptUrl = getScriptUrl(channel);
+
+    // ── Try disk cache first ─────────────────────────────────────────────────
+    const cached = await ipcRenderer.invoke('script-cache-read', channel);
+
+    if (cached && cached.script) {
+        injectScriptText(cached.script);
+        console.log(
+            `[ELXMOJ] Injected from cache (channel=${channel}, version=${cached.version || 'unknown'})`
+        );
+
+        // Background update check — at most once per app session.
+        if (!sessionStorage.getItem(UPDATE_CHECK_SESSION_KEY)) {
+            sessionStorage.setItem(UPDATE_CHECK_SESSION_KEY, '1');
+            // Defer so the current page render is not blocked.
+            setTimeout(() => backgroundUpdateCheck(channel, scriptUrl, cached.version), 0);
+        }
+        return;
+    }
+
+    // ── No cache: fetch now, save, inject ────────────────────────────────────
+    console.log(`[ELXMOJ] No local cache — fetching from ${scriptUrl} …`);
+    try {
+        const response = await fetch(scriptUrl, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const raw = await response.text();
+        const version = parseScriptVersion(raw);
+        const scriptText = stripUserScriptHeader(raw);
+        await ipcRenderer.invoke('script-cache-write', channel, scriptText, version);
+        injectScriptText(scriptText);
+        sessionStorage.setItem(UPDATE_CHECK_SESSION_KEY, '1');
+        console.log(`[ELXMOJ] Fetched and cached (version=${version || 'unknown'})`);
+    } catch (e) {
+        console.error('[ELXMOJ] Failed to fetch XMOJ script:', e.message);
+    }
+}
+
+/**
+ * Fetch the latest script from xmoj-bbs.me and compare its version against
+ * the currently running cached copy. If a newer version is available, show a
+ * native dialog. If the user accepts, persist the new script and reload.
+ */
+async function backgroundUpdateCheck(channel, scriptUrl, cachedVersion) {
+    try {
+        const response = await fetch(scriptUrl, { cache: 'no-store' });
+        if (!response.ok) return;
+        const raw = await response.text();
+        const newVersion = parseScriptVersion(raw);
+
+        if (!isNewer(cachedVersion, newVersion)) {
+            console.log(
+                `[ELXMOJ] Script up to date (version=${cachedVersion || newVersion || 'unknown'})`
+            );
+            return;
+        }
+
+        console.log(`[ELXMOJ] New version available: ${cachedVersion} → ${newVersion}`);
+
+        const accepted = await ipcRenderer.invoke('show-script-update-dialog', {
+            channel,
+            oldVersion: cachedVersion,
+            newVersion,
+        });
+
+        if (accepted) {
+            const scriptText = stripUserScriptHeader(raw);
+            await ipcRenderer.invoke('script-cache-write', channel, scriptText, newVersion);
+            console.log(`[ELXMOJ] Script updated to ${newVersion}. Reloading…`);
+            await ipcRenderer.invoke('script-reload');
+        }
+    } catch (e) {
+        console.warn('[ELXMOJ] Background update check failed:', e.message);
+    }
 }

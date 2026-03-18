@@ -82,6 +82,19 @@ let settingsWindow = null;
 
 const XMOJ_URL = 'https://www.xmoj.tech/';
 
+// Hostnames that should stay inside the app window (not open in an external browser)
+const XMOJ_HOSTS = new Set(['www.xmoj.tech', 'xmoj.tech']);
+
+function isXmojUrl(url) {
+    try {
+        const parsed = new URL(url);
+        return (parsed.protocol === 'https:' || parsed.protocol === 'http:')
+            && XMOJ_HOSTS.has(parsed.hostname);
+    } catch (_) {
+        return false;
+    }
+}
+
 // ─── Auto-updater ─────────────────────────────────────────────────────────────
 
 function setupAutoUpdater() {
@@ -155,7 +168,7 @@ ipcMain.handle('check-for-updates', () => {
             type: 'info',
             title: '开发模式',
             message: '自动更新在开发模式下不可用。',
-            buttons: ['OK'],
+            buttons: ['确定'],
         });
         return;
     }
@@ -354,22 +367,23 @@ async function createWindow() {
         mainWindow.setTitle(title ? `${title} — 小明的OJ` : '小明的OJ');
     });
 
-    // Open external links in the system browser
+    // Handle window.open() calls — deny all.
+    // xmoj.tech links navigate the current window; everything else opens in the OS browser.
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-        try {
-            const parsed = new URL(url);
-            const isXmoj = (parsed.protocol === 'https:' || parsed.protocol === 'http:')
-                && parsed.hostname === 'www.xmoj.tech';
-            if (!isXmoj) {
-                shell.openExternal(url);
-                return { action: 'deny' };
-            }
-        } catch (_) {
-            // Unparseable URL — deny and open externally
-            shell.openExternal(url);
-            return { action: 'deny' };
+        if (isXmojUrl(url)) {
+            setImmediate(() => mainWindow && mainWindow.loadURL(url));
+        } else {
+            shell.openExternal(url).catch(() => {});
         }
-        return { action: 'allow' };
+        return { action: 'deny' };
+    });
+
+    // Intercept <a href> navigations — same routing logic.
+    mainWindow.webContents.on('will-navigate', (event, url) => {
+        if (!isXmojUrl(url)) {
+            event.preventDefault();
+            shell.openExternal(url).catch(() => {});
+        }
     });
 
     await mainWindow.loadURL(XMOJ_URL);
@@ -463,6 +477,70 @@ ipcMain.handle('settings-get', (_event, key) => store.get(`settings.${key}`));
 // Navigate main window
 ipcMain.handle('navigate', (_event, url) => {
     mainWindow && mainWindow.loadURL(url);
+});
+
+// Reload main window (used by preload after a script cache update)
+ipcMain.handle('script-reload', () => {
+    mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents.reload();
+});
+
+// ─── Script cache IPC ─────────────────────────────────────────────────────────
+
+function getScriptCacheDir() {
+    return path.join(app.getPath('userData'), 'script-cache');
+}
+
+// Read cached script + version metadata from userData/script-cache/<channel>.{js,meta.json}
+ipcMain.handle('script-cache-read', (_event, channel) => {
+    const dir = getScriptCacheDir();
+    const jsFile = path.join(dir, `${channel}.js`);
+    const metaFile = path.join(dir, `${channel}.meta.json`);
+    try {
+        const script = fs.readFileSync(jsFile, 'utf8');
+        let version = null;
+        try {
+            const meta = JSON.parse(fs.readFileSync(metaFile, 'utf8'));
+            version = meta.version || null;
+        } catch (_) {}
+        return { script, version };
+    } catch (_) {
+        return null;
+    }
+});
+
+// Write script text + version metadata to disk
+ipcMain.handle('script-cache-write', (_event, channel, scriptText, version) => {
+    try {
+        const dir = getScriptCacheDir();
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(path.join(dir, `${channel}.js`), scriptText, 'utf8');
+        fs.writeFileSync(
+            path.join(dir, `${channel}.meta.json`),
+            JSON.stringify({ version: version || null, savedAt: Date.now() }),
+            'utf8'
+        );
+        return true;
+    } catch (e) {
+        console.error('[ScriptCache] Write error:', e.message);
+        return false;
+    }
+});
+
+// Show a native dialog asking whether to update the XMOJ script
+ipcMain.handle('show-script-update-dialog', async (_event, { channel, oldVersion, newVersion }) => {
+    const channelName = channel === 'dev' ? '开发版' : '正式版';
+    const { response } = await dialog.showMessageBox(mainWindow, {
+        type: 'question',
+        title: 'XMOJ 脚本更新',
+        message: `发现 XMOJ-Script 新版本（${channelName}）`,
+        detail: `当前版本：${oldVersion || '未知'}\n新版本：${newVersion}\n\n是否下载新版本并重新加载页面？`,
+        buttons: ['立即更新', '暂不更新'],
+        defaultId: 0,
+        cancelId: 1,
+    });
+    return response === 0;
 });
 
 // ─── App lifecycle ────────────────────────────────────────────────────────────

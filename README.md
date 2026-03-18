@@ -97,7 +97,7 @@ npm test
 1. **同步持久化设置** → 将 electron-store 中保存的设置写入页面 `localStorage`
 2. **注入 GM_* 兼容层** → 为 `GM_xmlhttpRequest`、`GM_setClipboard`、`GM.cookie` 等 API 提供原生实现
 3. **加载 @require 依赖** → 按顺序加载 CryptoJS、CodeMirror、DOMPurify、FileSaver、marked、diff-match-patch
-4. **注入 XMOJ.user.js** → 从 GitHub 获取最新脚本并注入，离线时回退到 sessionStorage 缓存
+4. **注入 XMOJ.user.js** → 优先从本地磁盘缓存（`userData/script-cache/<channel>.js`）加载脚本并立即注入，随后在后台检查 `xmoj-bbs.me`（正式版）或 `dev.xmoj-bbs.me`（调试模式）是否有新版本；若有则弹出对话框，用户确认后更新缓存并重载页面
 
 ---
 

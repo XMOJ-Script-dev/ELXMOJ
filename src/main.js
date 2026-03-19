@@ -24,6 +24,49 @@ let lastCheckResult = null;
 
 const LOCAL_SCRIPT_PATH = path.join(__dirname, "..", "XMOJ.user.js");
 const XMOJ_HOME = "https://www.xmoj.tech";
+const PRELOAD_PATH = path.join(__dirname, "preload.js");
+
+function createAppWebPreferences() {
+  return {
+    preload: PRELOAD_PATH,
+    contextIsolation: true,
+    nodeIntegration: false,
+    sandbox: false
+  };
+}
+
+function getPopupWindowOptions() {
+  return {
+    width: 1280,
+    height: 820,
+    minWidth: 980,
+    minHeight: 640,
+    title: "ELXMOJ",
+    webPreferences: createAppWebPreferences()
+  };
+}
+
+function attachPopupInjectionBehavior(targetWindow) {
+  if (!targetWindow || targetWindow.isDestroyed()) {
+    return;
+  }
+
+  targetWindow.webContents.setWindowOpenHandler(({ url }) => {
+    const nextUrl = String(url || "");
+    if (!/^https?:\/\//i.test(nextUrl)) {
+      return { action: "deny" };
+    }
+
+    return {
+      action: "allow",
+      overrideBrowserWindowOptions: getPopupWindowOptions()
+    };
+  });
+
+  targetWindow.webContents.on("did-create-window", (childWindow) => {
+    attachPopupInjectionBehavior(childWindow);
+  });
+}
 
 async function getPhpSessionIdFromCookieStore() {
   try {
@@ -222,14 +265,10 @@ function createMainWindow() {
     minWidth: 1100,
     minHeight: 680,
     title: "ELXMOJ",
-    webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false
-    }
+    webPreferences: createAppWebPreferences()
   });
 
+  attachPopupInjectionBehavior(mainWindow);
   mainWindow.loadURL(XMOJ_HOME);
   mainWindow.on("closed", () => {
     mainWindow = null;
@@ -252,12 +291,7 @@ function openSettingsWindow() {
     title: "ELXMOJ 设置",
     parent: mainWindow || undefined,
     modal: Boolean(mainWindow),
-    webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false
-    }
+    webPreferences: createAppWebPreferences()
   });
 
   settingsWindow.loadFile(path.join(__dirname, "settings.html"));

@@ -1,5 +1,5 @@
 const path = require("node:path");
-const { app, BrowserWindow, dialog, ipcMain, Menu, net, session } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, net, session, shell } = require("electron");
 
 const {
   loadSettings,
@@ -120,7 +120,31 @@ function attachPopupInjectionBehavior(targetWindow) {
 
   targetWindow.webContents.setWindowOpenHandler(({ url }) => {
     const nextUrl = String(url || "");
-    if (!/^https?:\/\//i.test(nextUrl)) {
+
+    let parsedTargetUrl;
+    try {
+      parsedTargetUrl = new URL(nextUrl);
+    } catch {
+      return { action: "deny" };
+    }
+
+    if (parsedTargetUrl.protocol !== "http:" && parsedTargetUrl.protocol !== "https:") {
+      return { action: "deny" };
+    }
+
+    let trustedOrigin = "";
+    try {
+      trustedOrigin = new URL(XMOJ_HOME).origin;
+    } catch {
+      trustedOrigin = "";
+    }
+
+    const targetOrigin = parsedTargetUrl.origin;
+
+    if (!trustedOrigin || targetOrigin !== trustedOrigin) {
+      shell.openExternal(nextUrl).catch(() => {
+        // Ignore failures to open external URLs
+      });
       return { action: "deny" };
     }
 

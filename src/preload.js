@@ -895,11 +895,11 @@ async function injectUserscriptWhenReady() {
     return;
   }
 
-  if (!acquireInjectionLock()) {
+  if (!location.hostname.endsWith("xmoj.tech") && location.hostname !== "116.62.212.172") {
     return;
   }
 
-  if (!location.hostname.endsWith("xmoj.tech") && location.hostname !== "116.62.212.172") {
+  if (!acquireInjectionLock()) {
     return;
   }
 

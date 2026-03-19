@@ -46,10 +46,77 @@ function getPopupWindowOptions() {
   };
 }
 
+function attachBrowserShortcutBehavior(targetWindow) {
+  if (!targetWindow || targetWindow.isDestroyed()) {
+    return;
+  }
+
+  const webContents = targetWindow.webContents;
+  if (!webContents || webContents.__ELXMOJ_SHORTCUTS_ATTACHED__) {
+    return;
+  }
+
+  webContents.__ELXMOJ_SHORTCUTS_ATTACHED__ = true;
+
+  webContents.on("before-input-event", (event, input) => {
+    if (!input || input.type !== "keyDown") {
+      return;
+    }
+
+    const key = String(input.key || "");
+    const normalizedKey = key.length === 1 ? key.toLowerCase() : key;
+    const hasMeta = Boolean(input.meta);
+    const hasCtrlOrMeta = Boolean(input.control || input.meta);
+    const hasShift = Boolean(input.shift);
+    const hasAlt = Boolean(input.alt);
+
+    const isHardReload =
+      (normalizedKey === "F5" && hasShift) ||
+      (hasCtrlOrMeta && hasShift && normalizedKey === "r");
+    if (isHardReload) {
+      event.preventDefault();
+      webContents.reloadIgnoringCache();
+      return;
+    }
+
+    const isReload = normalizedKey === "F5" || (hasCtrlOrMeta && normalizedKey === "r");
+    if (isReload) {
+      event.preventDefault();
+      webContents.reload();
+      return;
+    }
+
+    const isGoBack =
+      (hasAlt && normalizedKey === "ArrowLeft") ||
+      normalizedKey === "BrowserBack" ||
+      (hasMeta && !hasShift && normalizedKey === "[");
+    if (isGoBack) {
+      event.preventDefault();
+      if (webContents.canGoBack()) {
+        webContents.goBack();
+      }
+      return;
+    }
+
+    const isGoForward =
+      (hasAlt && normalizedKey === "ArrowRight") ||
+      normalizedKey === "BrowserForward" ||
+      (hasMeta && !hasShift && normalizedKey === "]");
+    if (isGoForward) {
+      event.preventDefault();
+      if (webContents.canGoForward()) {
+        webContents.goForward();
+      }
+    }
+  });
+}
+
 function attachPopupInjectionBehavior(targetWindow) {
   if (!targetWindow || targetWindow.isDestroyed()) {
     return;
   }
+
+  attachBrowserShortcutBehavior(targetWindow);
 
   targetWindow.webContents.setWindowOpenHandler(({ url }) => {
     const nextUrl = String(url || "");
@@ -268,6 +335,7 @@ function createMainWindow() {
     webPreferences: createAppWebPreferences()
   });
 
+  attachBrowserShortcutBehavior(mainWindow);
   attachPopupInjectionBehavior(mainWindow);
   mainWindow.loadURL(XMOJ_HOME);
   mainWindow.on("closed", () => {
@@ -294,6 +362,7 @@ function openSettingsWindow() {
     webPreferences: createAppWebPreferences()
   });
 
+  attachBrowserShortcutBehavior(settingsWindow);
   settingsWindow.loadFile(path.join(__dirname, "settings.html"));
   settingsWindow.on("closed", () => {
     settingsWindow = null;

@@ -182,7 +182,7 @@ function installCookieVisibilityShim(initialPhpSessionId) {
         return raw ? `${raw}; PHPSESSID=${shadow}` : `PHPSESSID=${shadow}`;
       },
       set(value) {
-        return nativeSet(value);
+        nativeSet(value);
       }
     });
     window[ELXMOJ_COOKIE_SHIM_INSTALLED_KEY] = true;
@@ -232,7 +232,7 @@ function setupMarkedFallback() {
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
-      .replace(/\"/g, "&quot;")
+      .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
 
   const parse = (markdown) => {
@@ -665,7 +665,7 @@ function setupGmPolyfills(payload = null) {
     await navigator.clipboard.writeText(String(text ?? ""));
   };
 
-  window.GM_registerMenuCommand = (_name, _callback) => {
+  window.GM_registerMenuCommand = () => {
     // Electron 版本先使用应用菜单提供命令，不在页面内重复注册。
   };
 

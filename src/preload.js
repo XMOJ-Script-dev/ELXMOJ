@@ -314,18 +314,114 @@ function setupTurnstileCallbackBridge() {
 
   window[ELXMOJ_TURNSTILE_BRIDGE_INSTALLED_KEY] = true;
 
+  const callbackStore = new Map();
+  let callbackCounter = 0;
+
+  const toPlainObject = (value) => {
+    if (!value || typeof value !== "object") {
+      return {};
+    }
+
+    const result = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (typeof item === "function") {
+        continue;
+      }
+      result[key] = item;
+    }
+    return result;
+  };
+
+  const bridgedTurnstile = {
+    render: (target, options = {}) => {
+      const safeOptions = toPlainObject(options);
+      const callbackId = `elxmoj_turnstile_cb_${Date.now()}_${++callbackCounter}`;
+      if (typeof options?.callback === "function") {
+        callbackStore.set(callbackId, options.callback);
+      }
+
+      window.postMessage(
+        {
+          __ELXMOJ_TURNSTILE_RENDER__: true,
+          target,
+          options: safeOptions,
+          callbackId
+        },
+        "*"
+      );
+
+      return callbackId;
+    },
+    reset: (widgetId) => {
+      window.postMessage(
+        {
+          __ELXMOJ_TURNSTILE_RESET__: true,
+          widgetId
+        },
+        "*"
+      );
+    },
+    remove: (widgetId) => {
+      window.postMessage(
+        {
+          __ELXMOJ_TURNSTILE_REMOVE__: true,
+          widgetId
+        },
+        "*"
+      );
+    }
+  };
+
+  if (!window.turnstile || typeof window.turnstile !== "object") {
+    window.turnstile = {};
+  }
+
+  if (typeof window.turnstile.render !== "function") {
+    window.turnstile.render = bridgedTurnstile.render;
+  }
+  if (typeof window.turnstile.reset !== "function") {
+    window.turnstile.reset = bridgedTurnstile.reset;
+  }
+  if (typeof window.turnstile.remove !== "function") {
+    window.turnstile.remove = bridgedTurnstile.remove;
+  }
+
   window.addEventListener("message", (event) => {
     const payload = event.data;
-    if (!payload || payload.__ELXMOJ_TURNSTILE_CALLBACK__ !== true) {
+    if (!payload || typeof payload !== "object") {
       return;
     }
 
-    try {
-      if (typeof window.CaptchaLoadedCallback === "function") {
-        window.CaptchaLoadedCallback(...(payload.args || []));
+    if (payload.__ELXMOJ_TURNSTILE_CALLBACK__ === true) {
+      try {
+        if (typeof window.CaptchaLoadedCallback === "function") {
+          window.CaptchaLoadedCallback(...(payload.args || []));
+        }
+      } catch (error) {
+        console.error("ELXMOJ turnstile callback bridge error:", error);
       }
-    } catch (error) {
-      console.error("ELXMOJ turnstile callback bridge error:", error);
+      return;
+    }
+
+    if (payload.__ELXMOJ_TURNSTILE_TOKEN__ === true) {
+      const callbackId = String(payload.callbackId || "");
+      if (!callbackId) {
+        return;
+      }
+
+      const callback = callbackStore.get(callbackId);
+      if (typeof callback === "function") {
+        try {
+          callback(String(payload.token || ""));
+        } catch (error) {
+          console.error("ELXMOJ turnstile token callback error:", error);
+        }
+      }
+      return;
+    }
+
+    if (payload.__ELXMOJ_TURNSTILE_ERROR__ === true) {
+      console.warn("ELXMOJ turnstile page render failed:", payload.message || "unknown error");
     }
   });
 
@@ -333,15 +429,95 @@ function setupTurnstileCallbackBridge() {
     const script = document.createElement("script");
     script.textContent = `
       (function () {
-        if (typeof window.CaptchaLoadedCallback === "function") {
+        if (window.__ELXMOJ_TURNSTILE_PAGE_BRIDGE__ === true) {
           return;
         }
+        window.__ELXMOJ_TURNSTILE_PAGE_BRIDGE__ = true;
+
+        var originalCaptchaLoadedCallback =
+          typeof window.CaptchaLoadedCallback === "function" ? window.CaptchaLoadedCallback : null;
         window.CaptchaLoadedCallback = function () {
+          if (typeof originalCaptchaLoadedCallback === "function") {
+            try {
+              originalCaptchaLoadedCallback.apply(window, arguments);
+            } catch (error) {
+              console.error("ELXMOJ page original CaptchaLoadedCallback error:", error);
+            }
+          }
           window.postMessage({
             __ELXMOJ_TURNSTILE_CALLBACK__: true,
             args: Array.prototype.slice.call(arguments)
           }, "*");
         };
+
+        var renderWithBridge = function (target, options, callbackId) {
+          if (!window.turnstile || typeof window.turnstile.render !== "function") {
+            return false;
+          }
+
+          var finalOptions = options && typeof options === "object" ? Object.assign({}, options) : {};
+          finalOptions.callback = function (token) {
+            window.postMessage(
+              {
+                __ELXMOJ_TURNSTILE_TOKEN__: true,
+                callbackId: callbackId,
+                token: String(token || "")
+              },
+              "*"
+            );
+          };
+
+          try {
+            window.turnstile.render(target, finalOptions);
+            return true;
+          } catch (error) {
+            window.postMessage(
+              {
+                __ELXMOJ_TURNSTILE_ERROR__: true,
+                message: String((error && error.message) || error || "turnstile.render failed")
+              },
+              "*"
+            );
+            return true;
+          }
+        };
+
+        window.addEventListener("message", function (event) {
+          var payload = event && event.data;
+          if (!payload || typeof payload !== "object") {
+            return;
+          }
+
+          if (payload.__ELXMOJ_TURNSTILE_RENDER__ === true) {
+            if (!renderWithBridge(payload.target, payload.options, payload.callbackId)) {
+              window.setTimeout(function () {
+                renderWithBridge(payload.target, payload.options, payload.callbackId);
+              }, 150);
+            }
+            return;
+          }
+
+          if (payload.__ELXMOJ_TURNSTILE_RESET__ === true) {
+            if (window.turnstile && typeof window.turnstile.reset === "function") {
+              try {
+                window.turnstile.reset(payload.widgetId);
+              } catch {
+                // ignore turnstile reset failures
+              }
+            }
+            return;
+          }
+
+          if (payload.__ELXMOJ_TURNSTILE_REMOVE__ === true) {
+            if (window.turnstile && typeof window.turnstile.remove === "function") {
+              try {
+                window.turnstile.remove(payload.widgetId);
+              } catch {
+                // ignore turnstile remove failures
+              }
+            }
+          }
+        });
       })();
     `;
     (document.documentElement || document.head || document.body).appendChild(script);

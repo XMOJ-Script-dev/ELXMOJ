@@ -29,6 +29,7 @@
     },
     "files": [
       "src/**/*",
+      "build/icons/**/*",
       "XMOJ.user.js",
       "package.json",
       "README.md",
@@ -37,18 +38,21 @@
     "asar": true,
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "win": {
+      "icon": "build/icons/app.ico",
       "target": [
         "nsis",
         "portable"
       ]
     },
     "mac": {
+      "icon": "build/icons/app.png",
       "target": [
         "zip"
       ],
       "category": "public.app-category.developer-tools"
     },
     "linux": {
+      "icon": "build/icons/app.png",
       "target": [
         "AppImage",
         "tar.gz"

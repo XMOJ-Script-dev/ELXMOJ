@@ -25,6 +25,13 @@ let lastCheckResult = null;
 const LOCAL_SCRIPT_PATH = path.join(__dirname, "..", "XMOJ.user.js");
 const XMOJ_HOME = "https://www.xmoj.tech";
 const PRELOAD_PATH = path.join(__dirname, "preload.js");
+const APP_ICON_PATH = path.join(
+  __dirname,
+  "..",
+  "build",
+  "icons",
+  process.platform === "win32" ? "app.ico" : "app.png"
+);
 
 function createAppWebPreferences() {
   return {
@@ -42,6 +49,7 @@ function getPopupWindowOptions() {
     minWidth: 980,
     minHeight: 640,
     title: "ELXMOJ",
+    icon: APP_ICON_PATH,
     webPreferences: createAppWebPreferences()
   };
 }
@@ -356,6 +364,7 @@ function createMainWindow() {
     minWidth: 1100,
     minHeight: 680,
     title: "ELXMOJ",
+    icon: APP_ICON_PATH,
     webPreferences: createAppWebPreferences()
   });
 
@@ -381,6 +390,7 @@ function openSettingsWindow() {
     maximizable: false,
     autoHideMenuBar: true,
     title: "ELXMOJ 设置",
+    icon: APP_ICON_PATH,
     parent: mainWindow || undefined,
     modal: Boolean(mainWindow),
     webPreferences: createAppWebPreferences()

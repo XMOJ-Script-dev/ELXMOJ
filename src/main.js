@@ -509,10 +509,27 @@ async function checkForScriptUpdate({ showNoUpdateDialog = false } = {}) {
   return { updated: true, currentVersion, remoteVersion };
 }
 
+function isTrustedIpcSender(event) {
+  try {
+    const url = event?.senderFrame?.url || "";
+    if (!url) {
+      return false;
+    }
+
+    const allowedPrefixes = ["file://", "app://"];
+    return allowedPrefixes.some((prefix) => url.startsWith(prefix));
+  } catch {
+    return false;
+  }
+}
+
 function registerIpcHandlers() {
   ipcMain.handle("elxmoj:get-settings", async () => getSettings());
 
-  ipcMain.handle("elxmoj:update-settings", async (_event, patch) => {
+  ipcMain.handle("elxmoj:update-settings", async (event, patch) => {
+    if (!isTrustedIpcSender(event)) {
+      throw new Error("Unauthorized IPC sender");
+    }
     const current = await getSettings();
     const next = { ...current, ...patch };
     await setSettings(next);
@@ -529,8 +546,18 @@ function registerIpcHandlers() {
     };
   });
 
-  ipcMain.handle("elxmoj:check-update", async () => checkForScriptUpdate({ showNoUpdateDialog: true }));
-  ipcMain.handle("elxmoj:run-self-check", async () => runSelfCheck(true));
+  ipcMain.handle("elxmoj:check-update", async (event) => {
+    if (!isTrustedIpcSender(event)) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    return checkForScriptUpdate({ showNoUpdateDialog: true });
+  });
+  ipcMain.handle("elxmoj:run-self-check", async (event) => {
+    if (!isTrustedIpcSender(event)) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    return runSelfCheck(true);
+  });
   ipcMain.handle("elxmoj:get-last-self-check", async () => lastCheckResult);
 
   ipcMain.handle("elxmoj:get-phpsessid", async () => {

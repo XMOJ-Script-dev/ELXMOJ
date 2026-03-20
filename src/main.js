@@ -558,7 +558,12 @@ function isTrustedIpcSender(event) {
 }
 
 function registerIpcHandlers() {
-  ipcMain.handle("elxmoj:get-settings", async () => getSettings());
+  ipcMain.handle("elxmoj:get-settings", async (event) => {
+    if (!isTrustedIpcSender(event)) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    return getSettings();
+  });
 
   ipcMain.handle("elxmoj:update-settings", async (event, patch) => {
     if (!isTrustedIpcSender(event)) {

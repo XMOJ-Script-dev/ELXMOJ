@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "description": "ELXMOJ Electron launcher with userscript updater",
   "main": "src/main.js",
+  "homepage": "https://app.xmoj-bbs.me",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/XMOJ-Script-dev/ELXMOJ.git"
+  },
   "license": "GPL-3.0-or-later",
   "scripts": {
     "start": "electron .",

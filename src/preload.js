@@ -994,8 +994,14 @@ if (isTrustedPreloadContext()) {
   contextBridge.exposeInMainWorld("ELXMOJ", {
     getSettings: () => ipcRenderer.invoke("elxmoj:get-settings"),
     updateSettings: (patch) => ipcRenderer.invoke("elxmoj:update-settings", patch),
+    getScriptDebugMode: () => ipcRenderer.invoke("elxmoj:get-script-debug-mode"),
+    setScriptDebugMode: (enabled) => ipcRenderer.invoke("elxmoj:set-script-debug-mode", enabled),
+    syncChannelFromScriptDebug: () => ipcRenderer.invoke("elxmoj:sync-channel-from-script-debug"),
     checkUpdate: () => ipcRenderer.invoke("elxmoj:check-update"),
     runSelfCheck: () => ipcRenderer.invoke("elxmoj:run-self-check"),
-    getLastSelfCheck: () => ipcRenderer.invoke("elxmoj:get-last-self-check")
+    getLastSelfCheck: () => ipcRenderer.invoke("elxmoj:get-last-self-check"),
+    getAppUpdateInfo: () => ipcRenderer.invoke("elxmoj:get-app-update-info"),
+    getAppUpdateUrl: () => ipcRenderer.invoke("elxmoj:get-app-update-url"),
+    openAppUpdatePage: () => ipcRenderer.invoke("elxmoj:open-app-update-page")
   });
 }

@@ -158,7 +158,7 @@
               <div>脚本来源</div>
               <div class="hint">正式版: xmoj-bbs.me，预览版: dev.xmoj-bbs.me</div>
             </div>
-            <select id="channel">
+            <select id="channel" title="脚本更新通道" aria-label="脚本更新通道">
               <option value="stable">正式版</option>
               <option value="preview">预览版</option>
             </select>
@@ -187,6 +187,12 @@
             <button id="btnCheckUpdate" class="btn-soft">立即检查更新</button>
             <button id="btnSelfCheck" class="btn-soft">执行自检</button>
           </div>
+          <div class="row">
+            <button id="btnAppUpdate" class="btn-soft">下载最新 App</button>
+          </div>
+          <div id="appVersionInfo" class="hint">App 版本信息: 加载中...</div>
+          <div id="appUpdateUrl" class="hint">下载地址: 加载中...</div>
+          <div id="appUpdateAdvice" class="hint"></div>
           <div id="status" class="status">等待操作...</div>
         </div>
 

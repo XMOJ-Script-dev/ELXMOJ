@@ -1,4 +1,5 @@
 const path = require("node:path");
+const https = require("node:https");
 const { app, BrowserWindow, dialog, ipcMain, Menu, net, session, shell } = require("electron");
 
 const {
@@ -41,6 +42,10 @@ let lastCheckResult = null;
 
 const LOCAL_SCRIPT_PATH = path.join(__dirname, "..", "XMOJ.user.js");
 const XMOJ_HOME = "https://www.xmoj.tech";
+const USER_SCRIPT_DEBUG_MODE_KEY = "UserScript-Setting-DebugMode";
+const APP_UPDATE_URL_TEMPLATE = "https://app.xmoj-bbs.me/{system}/{version}.{ext}";
+const APP_UPDATE_BASE_URL = "https://app.xmoj-bbs.me";
+const APP_RELEASES_API_URL = "https://api.github.com/repos/XMOJ-Script-dev/ELXMOJ/releases/latest";
 const PRELOAD_PATH = path.join(__dirname, "preload.js");
 const APP_ICON_PATH = path.join(
   __dirname,
@@ -49,6 +54,234 @@ const APP_ICON_PATH = path.join(
   "icons",
   process.platform === "win32" ? "app.ico" : "app.png"
 );
+
+function getUpdateSystemName() {
+  if (process.platform === "win32") return "windows";
+  if (process.platform === "darwin") return "macos";
+  if (process.platform === "linux") return "linux";
+  return process.platform;
+}
+
+function getPlatformPackageExtension() {
+  if (process.platform === "win32") return "exe";
+  if (process.platform === "darwin") return "dmg";
+  if (process.platform === "linux") return "AppImage";
+  return "bin";
+}
+
+function buildAppUpdateUrl(version) {
+  const normalizedVersion = String(version || app.getVersion()).trim();
+  const ext = getPlatformPackageExtension();
+  return APP_UPDATE_URL_TEMPLATE
+    .replace("{system}", getUpdateSystemName())
+    .replace("{version}", normalizedVersion)
+    .replace("{ext}", ext);
+}
+
+function getAppUpdateUrl() {
+  return buildAppUpdateUrl(app.getVersion());
+}
+
+function downloadTextWithHeaders(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(
+      url,
+      {
+        timeout: 15000,
+        headers
+      },
+      (res) => {
+        if (res.statusCode !== 200) {
+          reject(new Error(`HTTP ${res.statusCode} while downloading ${url}`));
+          res.resume();
+          return;
+        }
+
+        const chunks = [];
+        res.on("data", (chunk) => chunks.push(chunk));
+        res.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+      }
+    );
+
+    req.on("timeout", () => {
+      req.destroy(new Error(`Timeout while downloading ${url}`));
+    });
+    req.on("error", reject);
+  });
+}
+
+function parseVersionFromLatestYml(ymlText) {
+  const match = String(ymlText || "").match(/^\s*version\s*:\s*["']?([^"'\s]+)["']?/m);
+  return match ? String(match[1]).trim() : "";
+}
+
+function normalizeReleaseVersionTag(value) {
+  const raw = String(value || "").trim();
+  return raw.replace(/^v/i, "");
+}
+
+async function detectLatestVersionFromAppSource() {
+  const system = getUpdateSystemName();
+  const latestJsonUrl = `${APP_UPDATE_BASE_URL}/${system}/latest.json`;
+  const latestYmlUrl = `${APP_UPDATE_BASE_URL}/${system}/latest.yml`;
+
+  try {
+    const raw = await downloadText(latestJsonUrl);
+    const parsed = JSON.parse(raw);
+    const version = normalizeReleaseVersionTag(parsed?.version || parsed?.latest || parsed?.tag || "");
+    if (version) {
+      return { ok: true, version, source: latestJsonUrl };
+    }
+  } catch {
+    // fallback to yml below
+  }
+
+  try {
+    const raw = await downloadText(latestYmlUrl);
+    const version = normalizeReleaseVersionTag(parseVersionFromLatestYml(raw));
+    if (version) {
+      return { ok: true, version, source: latestYmlUrl };
+    }
+  } catch {
+    // fallback to GitHub release API below
+  }
+
+  return { ok: false, version: "", source: "" };
+}
+
+async function detectLatestVersionFromGitHub() {
+  try {
+    const raw = await downloadTextWithHeaders(APP_RELEASES_API_URL, {
+      "User-Agent": "ELXMOJ-App-Updater"
+    });
+    const parsed = JSON.parse(raw);
+    const version = normalizeReleaseVersionTag(parsed?.tag_name || parsed?.name || "");
+    if (!version) {
+      return { ok: false, version: "", source: APP_RELEASES_API_URL };
+    }
+    return { ok: true, version, source: APP_RELEASES_API_URL };
+  } catch {
+    return { ok: false, version: "", source: APP_RELEASES_API_URL };
+  }
+}
+
+async function getAppUpdateInfo() {
+  const currentVersion = app.getVersion();
+  let latest = await detectLatestVersionFromAppSource();
+
+  if (!latest.ok) {
+    latest = await detectLatestVersionFromGitHub();
+  }
+
+  if (!latest.ok || !latest.version) {
+    return {
+      ok: false,
+      currentVersion,
+      latestVersion: "",
+      hasUpdate: false,
+      downloadUrl: getAppUpdateUrl(),
+      source: "",
+      message: "未能获取最新版本。可在发布流程里生成并上传 latest.json 或 latest.yml（包含 version 字段），也可继续维护 GitHub Release 的最新 tag。"
+    };
+  }
+
+  return {
+    ok: true,
+    currentVersion,
+    latestVersion: latest.version,
+    hasUpdate: isNewerVersion(currentVersion, latest.version),
+    downloadUrl: buildAppUpdateUrl(latest.version),
+    source: latest.source,
+    message: ""
+  };
+}
+
+function getDebugModeFromChannel(channel) {
+  return String(channel || "stable") === "preview";
+}
+
+function getChannelFromDebugMode(debugMode) {
+  return debugMode ? "preview" : "stable";
+}
+
+function canReadMainWindowScriptSettings() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return false;
+  }
+
+  const url = String(mainWindow.webContents.getURL() || "");
+  if (!url) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(url);
+    return ["www.xmoj.tech", "xmoj.tech", "116.62.212.172"].includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+async function readScriptDebugModeFromMainWindow() {
+  if (!canReadMainWindowScriptSettings()) {
+    return null;
+  }
+
+  const code = `(() => {
+    try {
+      const value = localStorage.getItem(${JSON.stringify(USER_SCRIPT_DEBUG_MODE_KEY)});
+      if (value === "true") return true;
+      if (value === "false") return false;
+      return null;
+    } catch {
+      return null;
+    }
+  })()`;
+
+  try {
+    return await mainWindow.webContents.executeJavaScript(code, true);
+  } catch {
+    return null;
+  }
+}
+
+async function writeScriptDebugModeToMainWindow(debugMode) {
+  if (!canReadMainWindowScriptSettings()) {
+    return false;
+  }
+
+  const normalized = Boolean(debugMode);
+  const code = `(() => {
+    try {
+      localStorage.setItem(${JSON.stringify(USER_SCRIPT_DEBUG_MODE_KEY)}, ${JSON.stringify(String(normalized))});
+      return true;
+    } catch {
+      return false;
+    }
+  })()`;
+
+  try {
+    return await mainWindow.webContents.executeJavaScript(code, true);
+  } catch {
+    return false;
+  }
+}
+
+async function syncChannelFromScriptDebugMode() {
+  const debugMode = await readScriptDebugModeFromMainWindow();
+  if (typeof debugMode !== "boolean") {
+    return { synced: false, debugMode: null, channel: null };
+  }
+
+  const targetChannel = getChannelFromDebugMode(debugMode);
+  const current = await getSettings();
+  if (current.channel !== targetChannel) {
+    await setSettings({ ...current, channel: targetChannel });
+    return { synced: true, debugMode, channel: targetChannel };
+  }
+
+  return { synced: false, debugMode, channel: targetChannel };
+}
 
 function createAppWebPreferences() {
   return {
@@ -132,6 +365,13 @@ function attachBrowserShortcutBehavior(targetWindow) {
       if (webContents.canGoForward()) {
         webContents.goForward();
       }
+      return;
+    }
+
+    const isOpenSettings = hasCtrlOrMeta && normalizedKey === ",";
+    if (isOpenSettings) {
+      event.preventDefault();
+      openSettingsWindow();
     }
   });
 }
@@ -267,6 +507,7 @@ function createMainMenu() {
         { type: "separator" },
         {
           label: "设置",
+          accelerator: "CmdOrCtrl+,",
           click: () => openSettingsWindow()
         },
         {
@@ -344,6 +585,16 @@ function createMainMenu() {
     {
       label: "帮助",
       submenu: [
+        {
+          label: "下载最新版本",
+          click: async () => {
+            const info = await getAppUpdateInfo();
+            shell.openExternal(info.downloadUrl || getAppUpdateUrl()).catch(() => {
+              // Ignore failures to open update page
+            });
+          }
+        },
+        { type: "separator" },
         {
           label: "关于 ELXMOJ",
           click: async () => {
@@ -435,7 +686,8 @@ function buildSelfCheckReport({
     `脚本版本元数据(@version): ${hasVersionMeta ? `OK (${localVersion})` : "缺失"}`,
     `更新源可访问: ${urlReachable ? "OK" : "失败"}`,
     `注入状态: ${injectionReady ? "已就绪" : "未就绪"}`,
-    `更新通道: ${channel === "preview" ? "预览版" : "正式版"}`
+    `更新通道: ${channel === "preview" ? "预览版" : "正式版"}`,
+    `App 更新下载: ${getAppUpdateUrl()}`
   ];
   return lines.join("\n");
 }
@@ -450,6 +702,7 @@ async function checkUpdateEndpoint(channel) {
 }
 
 async function runSelfCheck(showDialog = false) {
+  await syncChannelFromScriptDebugMode();
   const settings = await getSettings();
   await ensureManagedScript(app, LOCAL_SCRIPT_PATH, getScriptBootstrapOptions());
   const localScript = await readManagedScript(app, LOCAL_SCRIPT_PATH, getScriptBootstrapOptions());
@@ -484,6 +737,7 @@ async function runSelfCheck(showDialog = false) {
 }
 
 async function checkForScriptUpdate({ showNoUpdateDialog = false } = {}) {
+  await syncChannelFromScriptDebugMode();
   const settings = await getSettings();
   await ensureManagedScript(app, LOCAL_SCRIPT_PATH, getScriptBootstrapOptions());
 
@@ -614,7 +868,56 @@ function registerIpcHandlers() {
     const current = await getSettings();
     const next = { ...current, ...patch };
     await setSettings(next);
+
+    if (Object.prototype.hasOwnProperty.call(patch || {}, "channel")) {
+      await writeScriptDebugModeToMainWindow(getDebugModeFromChannel(next.channel));
+    }
+
     return next;
+  });
+
+  ipcMain.handle("elxmoj:get-script-debug-mode", async (event) => {
+    if (!isTrustedIpcSender(event)) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    return readScriptDebugModeFromMainWindow();
+  });
+
+  ipcMain.handle("elxmoj:set-script-debug-mode", async (event, enabled) => {
+    if (!isTrustedIpcSender(event)) {
+      throw new Error("Unauthorized IPC sender");
+    }
+
+    const debugMode = Boolean(enabled);
+    const channel = getChannelFromDebugMode(debugMode);
+    const current = await getSettings();
+    if (current.channel !== channel) {
+      await setSettings({ ...current, channel });
+    }
+
+    const updated = await writeScriptDebugModeToMainWindow(debugMode);
+    return { ok: updated, debugMode, channel };
+  });
+
+  ipcMain.handle("elxmoj:sync-channel-from-script-debug", async (event) => {
+    if (!isTrustedIpcSender(event)) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    return syncChannelFromScriptDebugMode();
+  });
+
+  ipcMain.handle("elxmoj:update-channel-by-script-debug", async (event, enabled) => {
+    if (!isTrustedIpcSender(event)) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    const debugMode = Boolean(enabled);
+    const channel = getChannelFromDebugMode(debugMode);
+    const current = await getSettings();
+    if (current.channel !== channel) {
+      await setSettings({ ...current, channel });
+      return { updated: true, channel, debugMode };
+    }
+    return { updated: false, channel, debugMode };
   });
 
   ipcMain.handle("elxmoj:get-script-payload", async () => {
@@ -644,6 +947,31 @@ function registerIpcHandlers() {
       throw new Error("Unauthorized IPC sender");
     }
     return lastCheckResult;
+  });
+
+  ipcMain.handle("elxmoj:get-app-update-url", async (event) => {
+    if (!isTrustedIpcSender(event)) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    const info = await getAppUpdateInfo();
+    return info.downloadUrl || getAppUpdateUrl();
+  });
+
+  ipcMain.handle("elxmoj:get-app-update-info", async (event) => {
+    if (!isTrustedIpcSender(event)) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    return getAppUpdateInfo();
+  });
+
+  ipcMain.handle("elxmoj:open-app-update-page", async (event) => {
+    if (!isTrustedIpcSender(event)) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    const info = await getAppUpdateInfo();
+    const url = info.downloadUrl || getAppUpdateUrl();
+    await shell.openExternal(url);
+    return { ok: true, url };
   });
 
   ipcMain.handle("elxmoj:get-phpsessid", async () => {
@@ -836,6 +1164,7 @@ async function bootstrap() {
   createMainWindow();
 
   const settings = await getSettings();
+  await syncChannelFromScriptDebugMode();
   await ensureManagedScript(app, LOCAL_SCRIPT_PATH, getScriptBootstrapOptions());
   await runSelfCheck(process.argv.includes("--self-check"));
 

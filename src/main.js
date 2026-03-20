@@ -17,7 +17,22 @@ const {
   isNewerVersion
 } = require("./updater");
 
-const ALLOWED_GM_XHR_HOSTS = new Set(["www.xmoj.tech"]);
+const ALLOWED_GM_XHR_HOSTS = new Set([
+  "www.xmoj.tech",
+  "xmoj.tech",
+  "116.62.212.172",
+  "api.xmoj-bbs.me",
+  "api.xmoj-bbs.tech",
+  "cdnjs.cloudflare.com",
+  "cdn.jsdelivr.net",
+  "unpkg.com",
+  "raw.githubusercontent.com",
+  "gitee.com",
+  "challenges.cloudflare.com",
+  "cppinsights.io",
+  "127.0.0.1",
+  "localhost"
+]);
 
 let mainWindow = null;
 let settingsWindow = null;
@@ -547,13 +562,38 @@ async function checkForScriptUpdate({ showNoUpdateDialog = false } = {}) {
 
 function isTrustedIpcSender(event) {
   try {
-    const url = event?.senderFrame?.url || "";
+    const sender = event?.sender;
+    if (!sender || sender.isDestroyed()) {
+      return false;
+    }
+
+    const ownerWindow = BrowserWindow.fromWebContents(sender);
+    if (!ownerWindow || ownerWindow.isDestroyed()) {
+      return false;
+    }
+
+    const url = event?.senderFrame?.url || sender.getURL() || "";
     if (!url) {
       return false;
     }
 
-    const allowedPrefixes = ["file://", "app://"];
-    return allowedPrefixes.some((prefix) => url.startsWith(prefix));
+    if (url.startsWith("file://") || url.startsWith("app://")) {
+      return true;
+    }
+
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return false;
+    }
+
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      return false;
+    }
+
+    const allowedHosts = new Set(["www.xmoj.tech", "xmoj.tech", "116.62.212.172"]);
+    return allowedHosts.has(parsed.hostname);
   } catch {
     return false;
   }

@@ -847,16 +847,26 @@ function executeRequireScriptInCurrentContext(source, url) {
     throw new Error(`Empty script body for @require: ${url}`);
   }
 
-  // Run third-party @require code in a sandboxed VM context without Node/Electron globals.
-  const sandbox = {
-    console
-  };
-  const context = vm.createContext(sandbox);
+  // Run @require in the same isolated world so globals like CodeMirror are visible to userscript.
   const script = new vm.Script(`${code}\n//# sourceURL=${url}`, {
     filename: url,
     displayErrors: true
   });
-  script.runInContext(context);
+  script.runInThisContext();
+}
+
+function executeUserscriptInCurrentContext(source) {
+  const code = String(source ?? "");
+  if (!code.trim()) {
+    throw new Error("Userscript payload is empty");
+  }
+
+  // Run userscript in preload (isolated world) so GM_* polyfills are available.
+  const script = new vm.Script(`${code}\n//# sourceURL=elxmoj-userscript.js`, {
+    filename: "elxmoj-userscript.js",
+    displayErrors: true
+  });
+  script.runInThisContext();
 }
 
 async function loadScriptInCurrentContext(url) {
@@ -945,13 +955,7 @@ async function injectUserscriptWhenReady() {
     setupTurnstileCallbackBridge();
     setupHexMd5Polyfill();
 
-    // 在页面上下文执行 userscript：通过注入 <script> 元素到页面世界。
-    const scriptEl = document.createElement("script");
-    // 为了便于调试，可以给脚本一个可识别的 sourceURL（不会影响安全性）。
-    scriptEl.textContent = String(payload.scriptText) + "\n//# sourceURL=elxmoj-userscript.js";
-    (document.documentElement || document.head || document.body).appendChild(scriptEl);
-    // 插入后即可移除标签；代码已经在页面上下文执行。
-    scriptEl.parentNode.removeChild(scriptEl);
+    executeUserscriptInCurrentContext(payload.scriptText);
 
     window.__ELXMOJ_INJECTION_STATUS__ = {
       ok: true,

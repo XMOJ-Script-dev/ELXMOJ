@@ -39,7 +39,7 @@ let settingsWindow = null;
 let settingsCache = null;
 let lastCheckResult = null;
 
-const LOCAL_SCRIPT_PATH = path.join(__dirname, "..", "XMOJ.user.js");
+const LOCAL_SCRIPT_PATH = path.join(__dirname, "..", "XMOJ-Script", "XMOJ.user.js");
 const XMOJ_HOME = "https://www.xmoj.tech";
 const USER_SCRIPT_DEBUG_MODE_KEY = "UserScript-Setting-DebugMode";
 const APP_UPDATE_URL_TEMPLATE = "https://github.com/XMOJ-Script-dev/ELXMOJ/releases/download/v{version}/ELXMOJ-{version}.{ext}";

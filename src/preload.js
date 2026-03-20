@@ -963,10 +963,22 @@ if (document.readyState === "loading") {
   injectUserscriptWhenReady();
 }
 
-contextBridge.exposeInMainWorld("ELXMOJ", {
-  getSettings: () => ipcRenderer.invoke("elxmoj:get-settings"),
-  updateSettings: (patch) => ipcRenderer.invoke("elxmoj:update-settings", patch),
-  checkUpdate: () => ipcRenderer.invoke("elxmoj:check-update"),
-  runSelfCheck: () => ipcRenderer.invoke("elxmoj:run-self-check"),
-  getLastSelfCheck: () => ipcRenderer.invoke("elxmoj:get-last-self-check")
-});
+function isTrustedPreloadContext() {
+  try {
+    // Only expose the ELXMOJ bridge to local app pages (e.g., settings UI),
+    // and not to remote web content loaded over http/https.
+    return window.location && window.location.protocol === "file:";
+  } catch {
+    return false;
+  }
+}
+
+if (isTrustedPreloadContext()) {
+  contextBridge.exposeInMainWorld("ELXMOJ", {
+    getSettings: () => ipcRenderer.invoke("elxmoj:get-settings"),
+    updateSettings: (patch) => ipcRenderer.invoke("elxmoj:update-settings", patch),
+    checkUpdate: () => ipcRenderer.invoke("elxmoj:check-update"),
+    runSelfCheck: () => ipcRenderer.invoke("elxmoj:run-self-check"),
+    getLastSelfCheck: () => ipcRenderer.invoke("elxmoj:get-last-self-check")
+  });
+}

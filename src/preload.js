@@ -1000,7 +1000,6 @@ if (isTrustedPreloadContext()) {
     checkUpdate: () => ipcRenderer.invoke("elxmoj:check-update"),
     runSelfCheck: () => ipcRenderer.invoke("elxmoj:run-self-check"),
     getLastSelfCheck: () => ipcRenderer.invoke("elxmoj:get-last-self-check"),
-    getAppUpdateInfo: () => ipcRenderer.invoke("elxmoj:get-app-update-info"),
     getAppUpdateUrl: () => ipcRenderer.invoke("elxmoj:get-app-update-url"),
     openAppUpdatePage: () => ipcRenderer.invoke("elxmoj:open-app-update-page")
   });

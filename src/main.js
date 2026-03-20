@@ -1,5 +1,4 @@
 const path = require("node:path");
-const https = require("node:https");
 const { app, BrowserWindow, dialog, ipcMain, Menu, net, session, shell } = require("electron");
 
 const {
@@ -43,9 +42,7 @@ let lastCheckResult = null;
 const LOCAL_SCRIPT_PATH = path.join(__dirname, "..", "XMOJ.user.js");
 const XMOJ_HOME = "https://www.xmoj.tech";
 const USER_SCRIPT_DEBUG_MODE_KEY = "UserScript-Setting-DebugMode";
-const APP_UPDATE_URL_TEMPLATE = "https://app.xmoj-bbs.me/{system}/{version}.{ext}";
-const APP_UPDATE_BASE_URL = "https://app.xmoj-bbs.me";
-const APP_RELEASES_API_URL = "https://api.github.com/repos/XMOJ-Script-dev/ELXMOJ/releases/latest";
+const APP_UPDATE_URL_TEMPLATE = "https://github.com/XMOJ-Script-dev/ELXMOJ/releases/download/v{version}/ELXMOJ-{version}.{ext}";
 const PRELOAD_PATH = path.join(__dirname, "preload.js");
 const APP_ICON_PATH = path.join(
   __dirname,
@@ -66,134 +63,36 @@ function getPlatformPackageExtension() {
   if (process.platform === "win32") return "exe";
   if (process.platform === "darwin") return "dmg";
   if (process.platform === "linux") return "AppImage";
-  return "bin";
+  return "zip";
 }
 
-function buildAppUpdateUrl(version) {
-  const normalizedVersion = String(version || app.getVersion()).trim();
-  const ext = getPlatformPackageExtension();
-  return APP_UPDATE_URL_TEMPLATE
-    .replace("{system}", getUpdateSystemName())
-    .replace("{version}", normalizedVersion)
-    .replace("{ext}", ext);
+function getVersionSuffix(version) {
+  const raw = String(version || "").trim();
+  const semverMatch = raw.match(/^\d+\.\d+\.\d+(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/);
+  const prerelease = semverMatch?.[1] || "";
+
+  if (!prerelease) {
+    return "release";
+  }
+
+  const normalized = prerelease.toLowerCase();
+  if (normalized.startsWith("alpha")) return "alpha";
+  if (normalized.startsWith("beta")) return "beta";
+  if (normalized.startsWith("rc")) return "rc";
+  if (normalized.startsWith("dev")) return "dev";
+  if (normalized.startsWith("nightly")) return "nightly";
+  if (normalized.startsWith("canary")) return "canary";
+
+  // Fallback to prerelease tag itself when it is a custom identifier.
+  return normalized.replace(/[^a-z0-9.-]/g, "") || "preview";
 }
 
 function getAppUpdateUrl() {
-  return buildAppUpdateUrl(app.getVersion());
-}
-
-function downloadTextWithHeaders(url, headers = {}) {
-  return new Promise((resolve, reject) => {
-    const req = https.get(
-      url,
-      {
-        timeout: 15000,
-        headers
-      },
-      (res) => {
-        if (res.statusCode !== 200) {
-          reject(new Error(`HTTP ${res.statusCode} while downloading ${url}`));
-          res.resume();
-          return;
-        }
-
-        const chunks = [];
-        res.on("data", (chunk) => chunks.push(chunk));
-        res.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
-      }
-    );
-
-    req.on("timeout", () => {
-      req.destroy(new Error(`Timeout while downloading ${url}`));
-    });
-    req.on("error", reject);
-  });
-}
-
-function parseVersionFromLatestYml(ymlText) {
-  const match = String(ymlText || "").match(/^\s*version\s*:\s*["']?([^"'\s]+)["']?/m);
-  return match ? String(match[1]).trim() : "";
-}
-
-function normalizeReleaseVersionTag(value) {
-  const raw = String(value || "").trim();
-  return raw.replace(/^v/i, "");
-}
-
-async function detectLatestVersionFromAppSource() {
-  const system = getUpdateSystemName();
-  const latestJsonUrl = `${APP_UPDATE_BASE_URL}/${system}/latest.json`;
-  const latestYmlUrl = `${APP_UPDATE_BASE_URL}/${system}/latest.yml`;
-
-  try {
-    const raw = await downloadText(latestJsonUrl);
-    const parsed = JSON.parse(raw);
-    const version = normalizeReleaseVersionTag(parsed?.version || parsed?.latest || parsed?.tag || "");
-    if (version) {
-      return { ok: true, version, source: latestJsonUrl };
-    }
-  } catch {
-    // fallback to yml below
-  }
-
-  try {
-    const raw = await downloadText(latestYmlUrl);
-    const version = normalizeReleaseVersionTag(parseVersionFromLatestYml(raw));
-    if (version) {
-      return { ok: true, version, source: latestYmlUrl };
-    }
-  } catch {
-    // fallback to GitHub release API below
-  }
-
-  return { ok: false, version: "", source: "" };
-}
-
-async function detectLatestVersionFromGitHub() {
-  try {
-    const raw = await downloadTextWithHeaders(APP_RELEASES_API_URL, {
-      "User-Agent": "ELXMOJ-App-Updater"
-    });
-    const parsed = JSON.parse(raw);
-    const version = normalizeReleaseVersionTag(parsed?.tag_name || parsed?.name || "");
-    if (!version) {
-      return { ok: false, version: "", source: APP_RELEASES_API_URL };
-    }
-    return { ok: true, version, source: APP_RELEASES_API_URL };
-  } catch {
-    return { ok: false, version: "", source: APP_RELEASES_API_URL };
-  }
-}
-
-async function getAppUpdateInfo() {
-  const currentVersion = app.getVersion();
-  let latest = await detectLatestVersionFromAppSource();
-
-  if (!latest.ok) {
-    latest = await detectLatestVersionFromGitHub();
-  }
-
-  if (!latest.ok || !latest.version) {
-    return {
-      ok: false,
-      currentVersion,
-      latestVersion: "",
-      hasUpdate: false,
-      downloadUrl: getAppUpdateUrl(),
-      source: "",
-      message: "未能获取最新版本。可在发布流程里生成并上传 latest.json 或 latest.yml（包含 version 字段），也可继续维护 GitHub Release 的最新 tag。"
-    };
-  }
-
-  return {
-    ok: true,
-    currentVersion,
-    latestVersion: latest.version,
-    hasUpdate: isNewerVersion(currentVersion, latest.version),
-    downloadUrl: buildAppUpdateUrl(latest.version),
-    source: latest.source,
-    message: ""
-  };
+  const version = app.getVersion();
+  const ext = getPlatformPackageExtension();
+  return APP_UPDATE_URL_TEMPLATE
+    .replace("{version}", version)
+    .replace("{ext}", ext);
 }
 
 function getDebugModeFromChannel(channel) {
@@ -587,9 +486,8 @@ function createMainMenu() {
       submenu: [
         {
           label: "下载最新版本",
-          click: async () => {
-            const info = await getAppUpdateInfo();
-            shell.openExternal(info.downloadUrl || getAppUpdateUrl()).catch(() => {
+          click: () => {
+            shell.openExternal(getAppUpdateUrl()).catch(() => {
               // Ignore failures to open update page
             });
           }
@@ -953,23 +851,14 @@ function registerIpcHandlers() {
     if (!isTrustedIpcSender(event)) {
       throw new Error("Unauthorized IPC sender");
     }
-    const info = await getAppUpdateInfo();
-    return info.downloadUrl || getAppUpdateUrl();
-  });
-
-  ipcMain.handle("elxmoj:get-app-update-info", async (event) => {
-    if (!isTrustedIpcSender(event)) {
-      throw new Error("Unauthorized IPC sender");
-    }
-    return getAppUpdateInfo();
+    return getAppUpdateUrl();
   });
 
   ipcMain.handle("elxmoj:open-app-update-page", async (event) => {
     if (!isTrustedIpcSender(event)) {
       throw new Error("Unauthorized IPC sender");
     }
-    const info = await getAppUpdateInfo();
-    const url = info.downloadUrl || getAppUpdateUrl();
+    const url = getAppUpdateUrl();
     await shell.openExternal(url);
     return { ok: true, url };
   });

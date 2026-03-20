@@ -55,28 +55,10 @@ async function openAppUpdatePage() {
 
 async function showAppUpdateUrl() {
   try {
-    const info = await window.ELXMOJ.getAppUpdateInfo();
-    const url = info?.downloadUrl || (await window.ELXMOJ.getAppUpdateUrl());
-
-    const versionInfo = document.getElementById("appVersionInfo");
-    if (versionInfo) {
-      if (info?.ok) {
-        versionInfo.textContent = `App 版本: 当前 ${info.currentVersion}，最新 ${info.latestVersion}，${info.hasUpdate ? "可更新" : "已是最新"}`;
-      } else {
-        versionInfo.textContent = `App 版本: 当前 ${info?.currentVersion || "未知"}，最新版本获取失败`;
-      }
-    }
-
+    const url = await window.ELXMOJ.getAppUpdateUrl();
     const hint = document.getElementById("appUpdateUrl");
     if (hint) {
       hint.textContent = `下载地址: ${url}`;
-    }
-
-    const advice = document.getElementById("appUpdateAdvice");
-    if (advice) {
-      advice.textContent = info?.ok
-        ? ""
-        : `无法自动获取最新版本时，请提供 latest.json 或 latest.yml（含 version 字段）到更新源目录，或维护 GitHub Release 最新 tag。${info?.message ? ` 详情: ${info.message}` : ""}`;
     }
   } catch {
     // Ignore optional hint failures

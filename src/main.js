@@ -17,6 +17,8 @@ const {
   isNewerVersion
 } = require("./updater");
 
+const ALLOWED_GM_XHR_HOSTS = new Set(["www.xmoj.tech"]);
+
 let mainWindow = null;
 let settingsWindow = null;
 let settingsCache = null;
@@ -609,13 +611,34 @@ function registerIpcHandlers() {
     return value || "";
   });
 
-  ipcMain.handle("elxmoj:gm-xhr", async (_event, request) => {
+  ipcMain.handle("elxmoj:gm-xhr", async (event, request) => {
+    if (!isTrustedIpcSender(event)) {
+      throw new Error("Unauthorized IPC sender");
+    }
+
     const req = request || {};
     const url = String(req.url || "");
     if (!url) {
       return {
         ok: false,
         error: "GM_xmlhttpRequest requires a non-empty url"
+      };
+    }
+
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return {
+        ok: false,
+        error: "GM_xmlhttpRequest requires a valid URL"
+      };
+    }
+
+    if (!["http:", "https:"].includes(parsedUrl.protocol) || !ALLOWED_GM_XHR_HOSTS.has(parsedUrl.hostname)) {
+      return {
+        ok: false,
+        error: "GM_xmlhttpRequest URL is not allowed"
       };
     }
 

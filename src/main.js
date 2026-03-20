@@ -597,7 +597,12 @@ function registerIpcHandlers() {
     }
     return runSelfCheck(true);
   });
-  ipcMain.handle("elxmoj:get-last-self-check", async () => lastCheckResult);
+  ipcMain.handle("elxmoj:get-last-self-check", async (event) => {
+    if (!isTrustedIpcSender(event)) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    return lastCheckResult;
+  });
 
   ipcMain.handle("elxmoj:get-phpsessid", async () => {
     const value = await getPhpSessionIdFromCookieStore();

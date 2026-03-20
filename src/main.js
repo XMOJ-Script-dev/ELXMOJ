@@ -52,39 +52,11 @@ const APP_ICON_PATH = path.join(
   process.platform === "win32" ? "app.ico" : "app.png"
 );
 
-function getUpdateSystemName() {
-  if (process.platform === "win32") return "windows";
-  if (process.platform === "darwin") return "macos";
-  if (process.platform === "linux") return "linux";
-  return process.platform;
-}
-
 function getPlatformPackageExtension() {
   if (process.platform === "win32") return "exe";
   if (process.platform === "darwin") return "dmg";
   if (process.platform === "linux") return "AppImage";
   return "zip";
-}
-
-function getVersionSuffix(version) {
-  const raw = String(version || "").trim();
-  const semverMatch = raw.match(/^\d+\.\d+\.\d+(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/);
-  const prerelease = semverMatch?.[1] || "";
-
-  if (!prerelease) {
-    return "release";
-  }
-
-  const normalized = prerelease.toLowerCase();
-  if (normalized.startsWith("alpha")) return "alpha";
-  if (normalized.startsWith("beta")) return "beta";
-  if (normalized.startsWith("rc")) return "rc";
-  if (normalized.startsWith("dev")) return "dev";
-  if (normalized.startsWith("nightly")) return "nightly";
-  if (normalized.startsWith("canary")) return "canary";
-
-  // Fallback to prerelease tag itself when it is a custom identifier.
-  return normalized.replace(/[^a-z0-9.-]/g, "") || "preview";
 }
 
 function getAppUpdateUrl() {

@@ -847,7 +847,16 @@ function executeRequireScriptInCurrentContext(source, url) {
     throw new Error(`Empty script body for @require: ${url}`);
   }
 
-  vm.runInThisContext(`${code}\n//# sourceURL=${url}`);
+  // Run third-party @require code in a sandboxed VM context without Node/Electron globals.
+  const sandbox = {
+    console
+  };
+  const context = vm.createContext(sandbox);
+  const script = new vm.Script(`${code}\n//# sourceURL=${url}`, {
+    filename: url,
+    displayErrors: true
+  });
+  script.runInContext(context);
 }
 
 async function loadScriptInCurrentContext(url) {

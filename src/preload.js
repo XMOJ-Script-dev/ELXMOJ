@@ -945,9 +945,13 @@ async function injectUserscriptWhenReady() {
     setupTurnstileCallbackBridge();
     setupHexMd5Polyfill();
 
-    // 在页面上下文执行 userscript。
-    const runner = new Function(payload.scriptText);
-    runner();
+    // 在页面上下文执行 userscript：通过注入 <script> 元素到页面世界。
+    const scriptEl = document.createElement("script");
+    // 为了便于调试，可以给脚本一个可识别的 sourceURL（不会影响安全性）。
+    scriptEl.textContent = String(payload.scriptText) + "\n//# sourceURL=elxmoj-userscript.js";
+    (document.documentElement || document.head || document.body).appendChild(scriptEl);
+    // 插入后即可移除标签；代码已经在页面上下文执行。
+    scriptEl.parentNode.removeChild(scriptEl);
 
     window.__ELXMOJ_INJECTION_STATUS__ = {
       ok: true,

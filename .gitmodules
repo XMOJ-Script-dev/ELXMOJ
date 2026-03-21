@@ -1,0 +1,3 @@
+[submodule "XMOJ-Script"]
+	path = XMOJ-Script
+	url = https://github.com/XMOJ-Script-dev/XMOJ-Script

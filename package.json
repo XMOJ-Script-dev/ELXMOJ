@@ -1,0 +1,68 @@
+{
+  "name": "electro-xmoj",
+  "version": "1.0.0",
+  "description": "ELXMOJ Electron launcher with userscript updater",
+  "main": "src/main.js",
+  "homepage": "https://app.xmoj-bbs.me",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/XMOJ-Script-dev/ELXMOJ.git"
+  },
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "start": "electron .",
+    "self-check": "electron . --self-check",
+    "lint": "eslint src --ext .js",
+    "check:syntax": "node --check src/main.js && node --check src/preload.js && node --check src/settings.js && node --check src/storage.js && node --check src/updater.js",
+    "check": "npm run lint && npm run check:syntax",
+    "pack:win": "electron-builder --win nsis portable --publish never",
+    "pack:mac": "electron-builder --mac zip --publish never",
+    "pack:linux": "electron-builder --linux AppImage tar.gz --publish never"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.23.0",
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12",
+    "eslint": "^9.23.0",
+    "globals": "^16.0.0"
+  },
+  "build": {
+    "appId": "me.xmoj.elxmoj",
+    "productName": "ELXMOJ",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "build/icons/**/*",
+      "XMOJ-Script/XMOJ.user.js",
+      "package.json",
+      "README.md",
+      "LICENSE"
+    ],
+    "asar": true,
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "win": {
+      "icon": "build/icons/app.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "mac": {
+      "icon": "build/icons/app.png",
+      "target": [
+        "zip"
+      ],
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "icon": "build/icons/app.png",
+      "target": [
+        "AppImage",
+        "tar.gz"
+      ],
+      "category": "Development"
+    }
+  }
+}

@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ELXMOJ 设置</title>
+    <style>
+      :root {
+        --bg: #f3f7f4;
+        --card: #ffffff;
+        --text: #112015;
+        --muted: #4a6654;
+        --line: #d8e3db;
+        --brand: #0a7a4f;
+        --brand-soft: #e5f5ed;
+        --danger: #b12a2a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(1000px 400px at 100% -50%, #d6f4e5 0%, transparent 70%),
+          radial-gradient(700px 250px at -10% 110%, #d7ece0 0%, transparent 65%),
+          var(--bg);
+      }
+
+      .wrap {
+        padding: 20px;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px;
+        box-shadow: 0 8px 20px rgba(22, 60, 40, 0.08);
+      }
+
+      h1 {
+        margin: 0 0 6px;
+        font-size: 22px;
+      }
+
+      .desc {
+        margin: 0 0 16px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .section {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+        margin-bottom: 12px;
+      }
+
+      .title {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 10px;
+      }
+
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .row:last-child {
+        margin-bottom: 0;
+      }
+
+      .hint {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      select,
+      button {
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        font-size: 14px;
+      }
+
+      select {
+        padding: 8px 10px;
+        min-width: 150px;
+        background: #fff;
+      }
+
+      button {
+        padding: 9px 12px;
+        cursor: pointer;
+        background: #fff;
+      }
+
+      .btn-primary {
+        background: var(--brand);
+        color: #fff;
+        border-color: transparent;
+      }
+
+      .btn-soft {
+        background: var(--brand-soft);
+        border-color: #c9e8d7;
+      }
+
+      .btn-danger {
+        color: #fff;
+        background: var(--danger);
+        border-color: transparent;
+      }
+
+      .status {
+        margin-top: 10px;
+        border-radius: 10px;
+        background: #f8fbf9;
+        border: 1px dashed var(--line);
+        padding: 10px;
+        white-space: pre-line;
+        font-family: "Consolas", "Cascadia Code", monospace;
+        font-size: 12px;
+        max-height: 180px;
+        overflow: auto;
+      }
+
+      .switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .footer {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <h1>ELXMOJ 设置</h1>
+        <p class="desc">管理脚本更新通道、启动行为，以及手动自检。</p>
+
+        <div class="section">
+          <div class="title">更新通道</div>
+          <div class="row">
+            <div>
+              <div>脚本来源</div>
+              <div class="hint">正式版: xmoj-bbs.me，预览版: dev.xmoj-bbs.me</div>
+            </div>
+            <select id="channel" title="脚本更新通道" aria-label="脚本更新通道">
+              <option value="stable">正式版</option>
+              <option value="preview">预览版</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="title">启动行为</div>
+          <div class="row">
+            <label class="switch">
+              <input id="checkUpdateOnStartup" type="checkbox" />
+              启动时检查脚本更新
+            </label>
+          </div>
+          <div class="row">
+            <label class="switch">
+              <input id="autoInjectUserscript" type="checkbox" />
+              自动注入 userscript
+            </label>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="title">工具</div>
+          <div class="row">
+            <button id="btnCheckUpdate" class="btn-soft">立即检查更新</button>
+            <button id="btnSelfCheck" class="btn-soft">执行自检</button>
+          </div>
+          <div class="row">
+            <button id="btnAppUpdate" class="btn-soft">下载最新 App</button>
+          </div>
+          <div id="appUpdateUrl" class="hint">下载地址: 加载中...</div>
+          <div id="status" class="status">等待操作...</div>
+        </div>
+
+        <div class="footer">
+          <button id="btnClose">关闭</button>
+          <button id="btnSave" class="btn-primary">保存设置</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="./settings.js"></script>
+  </body>
+</html>

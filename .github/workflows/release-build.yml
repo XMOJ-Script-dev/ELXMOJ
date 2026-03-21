@@ -115,5 +115,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          files: release-assets/**
+          files: |
+            release-assets/*.exe
+            release-assets/*.msi
+            release-assets/*.zip
+            release-assets/*.dmg
+            release-assets/*.AppImage
+            release-assets/*.deb
+            release-assets/*.rpm
+            release-assets/*.tar.gz
+            release-assets/latest*.yml
+            release-assets/*.blockmap
+            release-assets/*.json
+            release-assets/*.sha256
           generate_release_notes: true

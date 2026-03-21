@@ -59,11 +59,52 @@ jobs:
           if-no-files-found: error
 
   publish:
+    # On tags: publish normally.
+    # On workflow_dispatch: create/push v<version> tag from package.json, then publish.
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
+
     steps:
+      - name: Checkout (for version + tagging)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js (for reading package.json)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Compute release tag from package.json
+        id: version
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # If the tag already exists remotely, do nothing.
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
+            echo "Tag ${TAG} already exists on origin."
+            exit 0
+          fi
+
+          git tag "${TAG}"
+          git push origin "${TAG}"
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -73,5 +114,6 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
           files: release-assets/**
           generate_release_notes: true

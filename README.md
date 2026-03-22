@@ -5,12 +5,10 @@
 ## 功能
 
 - 启动后打开 `www.xmoj.tech`
-- 自动注入子模块 `XMOJ-Script/XMOJ.user.js`（首次运行复制到用户数据目录）
+- 自动注入子模块 `XMOJ-Script/XMOJ.user.js`（首次运行自动下载）
 - 每次启动可检查脚本更新
 - 正式版更新源：`https://xmoj-bbs.me/XMOJ.user.js`
 - 预览版更新源：`https://dev.xmoj-bbs.me/XMOJ.user.js`
-- App 下载更新源：GitHub Releases `https://github.com/XMOJ-Script-dev/ELXMOJ/releases/download/v{version}/ELXMOJ-{version}.{ext}`
-	- ext 按平台自动适配：Windows `.exe` / macOS `.dmg` / Linux `.AppImage`
 - 发现新版本时弹窗提示用户是否更新
 - 设置持久化（通道、启动检查、自动注入）
 - 提供启动自检和手动自检

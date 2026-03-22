@@ -1,0 +1,822 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ELXMOJ — XMOJ 桌面端</title>
+    <meta name="description" content="ELXMOJ 是一款基于 Electron 的 XMOJ 桌面客户端，自动注入 XMOJ-Script，支持脚本自动更新、设置持久化。" />
+    <meta property="og:title" content="ELXMOJ — XMOJ 桌面端" />
+    <meta property="og:description" content="ELXMOJ 是一款基于 Electron 的 XMOJ 桌面客户端，自动注入 XMOJ-Script，支持脚本自动更新、设置持久化。" />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <style>
+      :root {
+        --bg: #f3f7f4;
+        --card: #ffffff;
+        --text: #112015;
+        --muted: #4a6654;
+        --line: #d8e3db;
+        --brand: #0a7a4f;
+        --brand-dark: #085f3d;
+        --brand-soft: #e5f5ed;
+        --brand-mid: #c9e8d7;
+        --danger: #b12a2a;
+        --win: #0078d4;
+        --mac: #555555;
+        --linux: #e95420;
+      }
+
+      *, *::before, *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+        color: var(--text);
+        background: var(--bg);
+        line-height: 1.6;
+      }
+
+      a {
+        color: var(--brand);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      /* ── NAV ─────────────────────────────────────── */
+      nav {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: rgba(243, 247, 244, 0.85);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .nav-inner {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 0 24px;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .nav-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 18px;
+        color: var(--text);
+        text-decoration: none;
+      }
+
+      .nav-logo .logo-icon {
+        width: 32px;
+        height: 32px;
+        background: var(--brand);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 16px;
+        font-weight: 800;
+        flex-shrink: 0;
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 4px;
+        list-style: none;
+      }
+
+      .nav-links a {
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 14px;
+        color: var(--muted);
+        font-weight: 500;
+        transition: background 0.15s, color 0.15s;
+        text-decoration: none;
+      }
+
+      .nav-links a:hover {
+        background: var(--brand-soft);
+        color: var(--brand);
+        text-decoration: none;
+      }
+
+      /* ── HERO ────────────────────────────────────── */
+      .hero {
+        padding: 80px 24px 64px;
+        text-align: center;
+        background:
+          radial-gradient(900px 400px at 70% -10%, #d6f4e5 0%, transparent 65%),
+          radial-gradient(600px 300px at -5% 110%, #d7ece0 0%, transparent 60%),
+          var(--bg);
+      }
+
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--brand-soft);
+        border: 1px solid var(--brand-mid);
+        color: var(--brand);
+        font-size: 13px;
+        font-weight: 600;
+        padding: 4px 12px;
+        border-radius: 99px;
+        margin-bottom: 20px;
+      }
+
+      .hero-badge .dot {
+        width: 6px;
+        height: 6px;
+        background: var(--brand);
+        border-radius: 50%;
+      }
+
+      .hero h1 {
+        font-size: clamp(36px, 7vw, 64px);
+        font-weight: 800;
+        letter-spacing: -1.5px;
+        line-height: 1.1;
+        margin-bottom: 16px;
+        color: var(--text);
+      }
+
+      .hero h1 span {
+        color: var(--brand);
+      }
+
+      .hero p {
+        font-size: 18px;
+        color: var(--muted);
+        max-width: 520px;
+        margin: 0 auto 32px;
+        line-height: 1.65;
+      }
+
+      .hero-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 22px;
+        border-radius: 12px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.12s, box-shadow 0.12s, opacity 0.12s;
+        text-decoration: none;
+        border: none;
+      }
+
+      .btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(10, 122, 79, 0.2);
+        text-decoration: none;
+      }
+
+      .btn:active {
+        transform: translateY(0);
+      }
+
+      .btn-primary {
+        background: var(--brand);
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(10, 122, 79, 0.25);
+      }
+
+      .btn-outline {
+        background: var(--card);
+        color: var(--text);
+        border: 1px solid var(--line);
+        box-shadow: 0 2px 6px rgba(17, 32, 21, 0.06);
+      }
+
+      /* ── SECTION WRAPPER ─────────────────────────── */
+      section {
+        padding: 64px 24px;
+      }
+
+      .section-inner {
+        max-width: 960px;
+        margin: 0 auto;
+      }
+
+      .section-label {
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--brand);
+        margin-bottom: 8px;
+      }
+
+      .section-title {
+        font-size: clamp(24px, 4vw, 36px);
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        margin-bottom: 12px;
+      }
+
+      .section-desc {
+        font-size: 16px;
+        color: var(--muted);
+        max-width: 540px;
+        margin-bottom: 40px;
+      }
+
+      /* ── FEATURES ────────────────────────────────── */
+      #features {
+        background: var(--card);
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 20px;
+      }
+
+      .feature-card {
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 20px;
+        transition: box-shadow 0.15s, transform 0.15s;
+      }
+
+      .feature-card:hover {
+        box-shadow: 0 8px 24px rgba(17, 32, 21, 0.08);
+        transform: translateY(-2px);
+      }
+
+      .feature-icon {
+        width: 44px;
+        height: 44px;
+        background: var(--brand-soft);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        margin-bottom: 14px;
+        flex-shrink: 0;
+      }
+
+      .feature-card h3 {
+        font-size: 16px;
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+
+      .feature-card p {
+        font-size: 14px;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      /* ── DOWNLOAD ────────────────────────────────── */
+      #download {
+        background: var(--bg);
+      }
+
+      .dl-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+
+      .dl-card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        transition: box-shadow 0.15s;
+      }
+
+      .dl-card:hover {
+        box-shadow: 0 6px 20px rgba(17, 32, 21, 0.08);
+      }
+
+      .dl-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .dl-os-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        flex-shrink: 0;
+      }
+
+      .dl-os-icon.win { background: #dceeff; }
+      .dl-os-icon.mac { background: #ebebeb; }
+      .dl-os-icon.linux { background: #fdeee8; }
+
+      .dl-os-name {
+        font-weight: 700;
+        font-size: 16px;
+      }
+
+      .dl-os-arch {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .dl-links {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .dl-link {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text);
+        text-decoration: none;
+        transition: background 0.12s, border-color 0.12s;
+        gap: 8px;
+      }
+
+      .dl-link:hover {
+        background: var(--brand-soft);
+        border-color: var(--brand-mid);
+        text-decoration: none;
+        color: var(--brand-dark);
+      }
+
+      .dl-link .dl-name {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .dl-link .dl-size {
+        color: var(--muted);
+        font-size: 12px;
+        flex-shrink: 0;
+      }
+
+      .dl-link .dl-arrow {
+        flex-shrink: 0;
+        opacity: 0.5;
+      }
+
+      #dl-version-tag {
+        font-size: 14px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      #dl-version-tag a {
+        color: var(--brand);
+        font-weight: 600;
+      }
+
+      .dl-loading, .dl-error {
+        text-align: center;
+        padding: 32px;
+        color: var(--muted);
+        font-size: 15px;
+        grid-column: 1 / -1;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+      }
+
+      .dl-error { color: var(--danger); }
+
+      /* ── HOW IT WORKS ────────────────────────────── */
+      #how {
+        background: var(--card);
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .steps {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        position: relative;
+        max-width: 600px;
+      }
+
+      .steps::before {
+        content: "";
+        position: absolute;
+        left: 19px;
+        top: 44px;
+        bottom: 44px;
+        width: 2px;
+        background: var(--line);
+        border-radius: 2px;
+      }
+
+      .step {
+        display: flex;
+        gap: 20px;
+        padding: 20px 0;
+        position: relative;
+      }
+
+      .step-num {
+        width: 40px;
+        height: 40px;
+        background: var(--brand);
+        color: #fff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 16px;
+        flex-shrink: 0;
+        position: relative;
+        z-index: 1;
+      }
+
+      .step-body h3 {
+        font-size: 16px;
+        font-weight: 700;
+        margin-bottom: 4px;
+        padding-top: 8px;
+      }
+
+      .step-body p {
+        font-size: 14px;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      /* ── FOOTER ──────────────────────────────────── */
+      footer {
+        background: var(--text);
+        color: rgba(255, 255, 255, 0.75);
+        padding: 40px 24px;
+      }
+
+      .footer-inner {
+        max-width: 960px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        text-align: center;
+      }
+
+      .footer-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #fff;
+        font-weight: 700;
+        font-size: 17px;
+      }
+
+      .footer-logo .logo-icon {
+        width: 30px;
+        height: 30px;
+        background: var(--brand);
+        border-radius: 7px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 800;
+        color: #fff;
+      }
+
+      .footer-links {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .footer-links a {
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 14px;
+        text-decoration: none;
+        transition: color 0.12s;
+      }
+
+      .footer-links a:hover {
+        color: #fff;
+        text-decoration: none;
+      }
+
+      .footer-copy {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      /* ── RESPONSIVE ──────────────────────────────── */
+      @media (max-width: 600px) {
+        nav .nav-links {
+          display: none;
+        }
+
+        .hero {
+          padding: 56px 20px 48px;
+        }
+
+        .hero p {
+          font-size: 16px;
+        }
+
+        section {
+          padding: 48px 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- NAV -->
+    <nav>
+      <div class="nav-inner">
+        <a class="nav-logo" href="#">
+          <div class="logo-icon">E</div>
+          ELXMOJ
+        </a>
+        <ul class="nav-links">
+          <li><a href="#features">功能</a></li>
+          <li><a href="#download">下载</a></li>
+          <li><a href="#how">使用说明</a></li>
+          <li><a href="https://github.com/XMOJ-Script-dev/ELXMOJ" target="_blank" rel="noopener">GitHub</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- HERO -->
+    <div class="hero">
+      <div class="hero-badge">
+        <span class="dot"></span>
+        基于 Electron · 跨平台桌面端
+      </div>
+      <h1>更好的方式访问<br /><span>XMOJ</span></h1>
+      <p>ELXMOJ 是专为 XMOJ 打造的桌面客户端，自动注入 XMOJ-Script，支持脚本更新检测与设置持久化，让刷题体验更流畅。</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#download">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12L3 7h3V2h4v5h3L8 12z"/><path d="M2 14h12v-1.5H2V14z"/></svg>
+          立即下载
+        </a>
+        <a class="btn btn-outline" href="https://github.com/XMOJ-Script-dev/ELXMOJ" target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 005.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 012-.27 7.65 7.65 0 012 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          查看源码
+        </a>
+      </div>
+    </div>
+
+    <!-- FEATURES -->
+    <section id="features">
+      <div class="section-inner">
+        <div class="section-label">功能特性</div>
+        <h2 class="section-title">为 XMOJ 量身打造</h2>
+        <p class="section-desc">集成 XMOJ-Script 的全部增强功能，提供原生桌面体验。</p>
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon">💉</div>
+            <h3>自动注入脚本</h3>
+            <p>启动时自动加载 XMOJ-Script userscript，无需浏览器扩展，开箱即用。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🔄</div>
+            <h3>脚本更新检测</h3>
+            <p>每次启动可自动检查脚本是否有新版本，发现更新时弹窗提示，一键更新。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🌿</div>
+            <h3>双更新通道</h3>
+            <p>支持正式版（xmoj-bbs.me）与预览版（dev.xmoj-bbs.me）两个更新通道，自由切换。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">💾</div>
+            <h3>设置持久化</h3>
+            <p>通道选择、启动行为等设置自动保存，重启后依然生效，无需重复配置。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🖥️</div>
+            <h3>跨平台支持</h3>
+            <p>原生支持 Windows、macOS 和 Linux，提供与系统一致的桌面体验。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🔍</div>
+            <h3>启动自检</h3>
+            <p>内置自检功能，可在菜单或设置中手动执行，快速诊断运行环境是否正常。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DOWNLOAD -->
+    <section id="download">
+      <div class="section-inner">
+        <div class="section-label">下载</div>
+        <h2 class="section-title">选择你的平台</h2>
+        <p class="section-desc">从 GitHub Releases 获取最新版本，支持 Windows、macOS 和 Linux。</p>
+        <div class="dl-grid" id="dl-grid">
+          <div class="dl-loading">⏳ 正在加载最新版本信息…</div>
+        </div>
+        <p id="dl-version-tag"></p>
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section id="how">
+      <div class="section-inner">
+        <div class="section-label">使用说明</div>
+        <h2 class="section-title">上手只需三步</h2>
+        <p class="section-desc">下载安装后即可开始使用，无需复杂配置。</p>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <h3>下载并安装</h3>
+              <p>根据操作系统选择对应的安装包，Windows 运行 <code>.exe</code> 安装程序，macOS 解压 <code>.zip</code>，Linux 使用 AppImage 或 tar.gz。</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <h3>启动应用</h3>
+              <p>首次启动会自动初始化 XMOJ-Script，并打开 <a href="https://www.xmoj.tech" target="_blank" rel="noopener">www.xmoj.tech</a>，脚本将自动注入到页面中。</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <h3>按需配置</h3>
+              <p>通过菜单栏 <strong>ELXMOJ → 设置</strong> 可调整更新通道、启动行为，以及手动执行自检或更新脚本。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+      <div class="footer-inner">
+        <div class="footer-logo">
+          <div class="logo-icon">E</div>
+          ELXMOJ
+        </div>
+        <div class="footer-links">
+          <a href="https://github.com/XMOJ-Script-dev/ELXMOJ" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/XMOJ-Script-dev/ELXMOJ/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://github.com/XMOJ-Script-dev/ELXMOJ/issues" target="_blank" rel="noopener">反馈问题</a>
+          <a href="https://www.xmoj.tech" target="_blank" rel="noopener">XMOJ</a>
+          <a href="https://github.com/XMOJ-Script-dev/ELXMOJ/blob/master/LICENSE" target="_blank" rel="noopener">GPL-3.0</a>
+        </div>
+        <div class="footer-copy">© 2026 XMOJ-Script-dev · 基于 GPL-3.0 开源协议</div>
+      </div>
+    </footer>
+
+    <script>
+      (function () {
+        const RELEASES_API = "https://api.github.com/repos/XMOJ-Script-dev/ELXMOJ/releases/latest";
+        const RELEASES_PAGE = "https://github.com/XMOJ-Script-dev/ELXMOJ/releases";
+
+        function formatBytes(bytes) {
+          if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(0) + " MB";
+          if (bytes >= 1024) return (bytes / 1024).toFixed(0) + " KB";
+          return bytes + " B";
+        }
+
+        function classifyAsset(name) {
+          const n = name.toLowerCase();
+          if (n.endsWith(".blockmap") || n.endsWith(".yml") || n.endsWith(".yaml")) return null;
+          if (n.includes("win")) return { os: "win",   label: "Windows" };
+          if (n.includes("mac") || n.includes("darwin")) return { os: "mac", label: "macOS"   };
+          if (n.includes("linux")) return { os: "linux", label: "Linux"  };
+          return null;
+        }
+
+        function osIcon(os) {
+          if (os === "win")   return "🪟";
+          if (os === "mac")   return "🍎";
+          if (os === "linux") return "🐧";
+          return "💻";
+        }
+
+        function formatLabel(name) {
+          // Strip leading product name + version prefix for readability
+          return name.replace(/^ELXMOJ-[\d.]*[-_]?/, "") || name;
+        }
+
+        async function loadDownloads() {
+          const grid = document.getElementById("dl-grid");
+          const versionTag = document.getElementById("dl-version-tag");
+
+          try {
+            const res = await fetch(RELEASES_API, {
+              headers: { Accept: "application/vnd.github+json" }
+            });
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            const release = await res.json();
+
+            const grouped = { win: [], mac: [], linux: [] };
+            for (const asset of release.assets || []) {
+              const info = classifyAsset(asset.name);
+              if (info && grouped[info.os]) {
+                grouped[info.os].push(asset);
+              }
+            }
+
+            const cards = [];
+            for (const [os, assets] of Object.entries(grouped)) {
+              if (assets.length === 0) continue;
+              const osLabel = { win: "Windows", mac: "macOS", linux: "Linux" }[os];
+              const links = assets.map(a => `
+                <a class="dl-link" href="${a.browser_download_url}" target="_blank" rel="noopener">
+                  <span class="dl-name">${formatLabel(a.name)}</span>
+                  <span class="dl-size">${formatBytes(a.size)}</span>
+                  <svg class="dl-arrow" width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                    <path d="M7 10.5L2.5 6H5.5V2h3v4H11.5L7 10.5z"/>
+                    <path d="M1 12.5h12v-1.5H1V12.5z"/>
+                  </svg>
+                </a>
+              `).join("");
+
+              cards.push(`
+                <div class="dl-card">
+                  <div class="dl-header">
+                    <div class="dl-os-icon ${os}">${osIcon(os)}</div>
+                    <div>
+                      <div class="dl-os-name">${osLabel}</div>
+                    </div>
+                  </div>
+                  <div class="dl-links">${links}</div>
+                </div>
+              `);
+            }
+
+            if (cards.length === 0) {
+              grid.innerHTML = `<div class="dl-error">暂无下载文件，请访问 <a href="${RELEASES_PAGE}" target="_blank" rel="noopener">GitHub Releases</a> 页面。</div>`;
+            } else {
+              grid.innerHTML = cards.join("");
+            }
+
+            const rawDate = new Date(release.published_at);
+            const date = isNaN(rawDate.getTime())
+              ? release.published_at || ""
+              : rawDate.toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" });
+            versionTag.innerHTML = `最新版本：<a href="${release.html_url}" target="_blank" rel="noopener">${release.tag_name}</a> · 发布于 ${date}`;
+          } catch (err) {
+            grid.innerHTML = `
+              <div class="dl-error">
+                无法加载版本信息，请直接访问
+                <a href="${RELEASES_PAGE}" target="_blank" rel="noopener">GitHub Releases</a>
+                下载最新版本。
+              </div>`;
+          }
+        }
+
+        loadDownloads();
+      })();
+    </script>
+  </body>
+</html>

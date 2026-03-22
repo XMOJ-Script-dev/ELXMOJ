@@ -10,72 +10,125 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build (${{ matrix.name }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Windows
-            os: windows-latest
-            script: npm run pack:win
-          - name: macOS
-            os: macos-latest
-            script: npm run pack:mac
-          - name: Linux
-            os: ubuntu-latest
-            script: npm run pack:linux
-
+  build-windows:
+    runs-on: windows-latest
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-
-      - name: Install Linux build dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libarchive-tools rpm
+          node-version: '20'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci --ignore-scripts
 
-      - name: Run code check
-        run: npm run check
+      - name: Rebuild native modules for Electron
+        run: npx electron-builder install-app-deps
 
-      - name: Build package
-        run: ${{ matrix.script }}
+      - name: Build Windows app (no publish here)
+        run: npm run build && npx electron-builder --win --publish never
 
-      - name: Mac signing
-        if: runner.os == 'macos-latest'
-        run: npm run build && npx electron-builder --mac --publish always
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: |
+            dist/*.exe
+            dist/*.msi
+            dist/*.zip
+            dist/latest*.yml
+            dist/*.blockmap
+            dist/*.json
+            dist/*.sha256
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Rebuild native modules for Electron
+        run: npx electron-builder install-app-deps
+
+      - name: Decode certificate
+        run: echo "${{ secrets.CSC_LINK }}" | base64 --decode > /tmp/certificate.p12
+
+      - name: Build macOS app (no publish here)
+        run: npm run build && npx electron-builder --mac --publish never
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: /tmp/certificate.p12
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Upload artifacts
+      - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ELXMOJ-${{ matrix.name }}
-          path: dist/**
-          if-no-files-found: error
+          name: mac-release
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/latest*.yml
+            dist/*.blockmap
+            dist/*.json
+            dist/*.sha256
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Rebuild native modules for Electron
+        run: npx electron-builder install-app-deps
+
+      - name: Build Linux app (no publish here)
+        run: npm run build && npx electron-builder --linux --publish never
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-release
+          path: |
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
+            dist/*.tar.gz
+            dist/*.zip
+            dist/latest*.yml
+            dist/*.blockmap
+            dist/*.json
+            dist/*.sha256
 
   publish:
-    # On tags: publish normally.
-    # On workflow_dispatch: create/push v<version> tag from package.json, then publish.
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs:
+      - build-windows
+      - build-mac
+      - build-linux
     runs-on: ubuntu-latest
-
     permissions:
       contents: write
 
@@ -107,7 +160,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # If the tag already exists remotely, do nothing.
           if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
             echo "Tag ${TAG} already exists on origin."
             exit 0

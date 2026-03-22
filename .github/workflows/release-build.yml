@@ -51,6 +51,17 @@ jobs:
       - name: Build package
         run: ${{ matrix.script }}
 
+      - name: Mac signing
+        if: runner.os == 'macos-latest'
+        run: npm run build && npx electron-builder --mac --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: /tmp/certificate.p12
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:

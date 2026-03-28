@@ -28,8 +28,10 @@ jobs:
       - name: Rebuild native modules for Electron
         run: npx electron-builder install-app-deps
 
-      - name: Build Windows app (no publish here)
-        run: npm run build && npx electron-builder --win --publish never
+      - name: Build Windows app (nsis + portable, no publish here)
+        run: |
+          npm run build
+          npx electron-builder --win nsis portable --publish never
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -37,7 +39,9 @@ jobs:
           name: windows-release
           path: |
             dist/*.exe
-            dist/*.msi
+            dist/*portable*.exe
+            dist/*-portable.exe
+            dist/*setup*.exe
             dist/*.zip
             dist/latest*.yml
             dist/*.blockmap
@@ -179,8 +183,10 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           files: |
+            release-assets/*portable*.exe
+            release-assets/*-portable.exe
+            release-assets/*setup*.exe
             release-assets/*.exe
-            release-assets/*.msi
             release-assets/*.zip
             release-assets/*.dmg
             release-assets/*.AppImage

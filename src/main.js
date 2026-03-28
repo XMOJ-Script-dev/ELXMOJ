@@ -45,6 +45,7 @@ const USER_SCRIPT_DEBUG_MODE_KEY = "UserScript-Setting-DebugMode";
 const GITHUB_RELEASES_API = "https://api.github.com/repos/XMOJ-Script-dev/ELXMOJ/releases/latest";
 const GITHUB_RELEASES_PAGE = "https://github.com/XMOJ-Script-dev/ELXMOJ/releases/latest";
 const PRELOAD_PATH = path.join(__dirname, "preload.js");
+const SETTINGS_HTML_PATH = path.join(__dirname, "settings.html");
 const APP_ICON_PATH = path.join(
   __dirname,
   "..",
@@ -205,6 +206,87 @@ function getPopupWindowOptions() {
   };
 }
 
+function isBlockedScriptUpdateUrl(rawUrl) {
+  const urlText = String(rawUrl || "").trim();
+  if (!urlText) {
+    return false;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(urlText);
+  } catch {
+    return false;
+  }
+
+  const hostname = String(parsed.hostname || "").toLowerCase();
+  const pathname = String(parsed.pathname || "");
+  const normalizedPath = pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+
+  if (hostname === "api.github.com" && normalizedPath === "/repos/XMOJ-Script-dev/ELXMOJ/releases/latest") {
+    return true;
+  }
+
+  if (hostname === "github.com" && /^\/XMOJ-Script-dev\/ELXMOJ\/releases(\/latest)?$/i.test(normalizedPath)) {
+    return true;
+  }
+
+  if ((hostname === "xmoj-bbs.me" || hostname === "dev.xmoj-bbs.me") && /\/XMOJ\.user\.js$/i.test(normalizedPath)) {
+    return true;
+  }
+
+  return false;
+}
+
+function isAllowedInAppUrl(rawUrl) {
+  const urlText = String(rawUrl || "").trim();
+  if (!urlText) {
+    return false;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(urlText);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol === "file:" || parsed.protocol === "app:") {
+    return true;
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return false;
+  }
+
+  const hostname = String(parsed.hostname || "").toLowerCase();
+  if (!hostname) {
+    return false;
+  }
+
+  return hostname === "xmoj.tech" || hostname.endsWith(".xmoj.tech") || hostname === "116.62.212.172";
+}
+
+function openHttpUrlExternally(rawUrl) {
+  const urlText = String(rawUrl || "").trim();
+  if (!urlText) {
+    return;
+  }
+
+  try {
+    const parsed = new URL(urlText);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return;
+    }
+
+    shell.openExternal(urlText).catch(() => {
+      // Ignore failures to open external URLs
+    });
+  } catch {
+    // Ignore invalid URLs
+  }
+}
+
 function attachBrowserShortcutBehavior(targetWindow) {
   if (!targetWindow || targetWindow.isDestroyed()) {
     return;
@@ -287,30 +369,12 @@ function attachPopupInjectionBehavior(targetWindow) {
   targetWindow.webContents.setWindowOpenHandler(({ url }) => {
     const nextUrl = String(url || "");
 
-    let parsedTargetUrl;
-    try {
-      parsedTargetUrl = new URL(nextUrl);
-    } catch {
+    if (isBlockedScriptUpdateUrl(nextUrl)) {
       return { action: "deny" };
     }
 
-    if (parsedTargetUrl.protocol !== "http:" && parsedTargetUrl.protocol !== "https:") {
-      return { action: "deny" };
-    }
-
-    let trustedOrigin = "";
-    try {
-      trustedOrigin = new URL(XMOJ_HOME).origin;
-    } catch {
-      trustedOrigin = "";
-    }
-
-    const targetOrigin = parsedTargetUrl.origin;
-
-    if (!trustedOrigin || targetOrigin !== trustedOrigin) {
-      shell.openExternal(nextUrl).catch(() => {
-        // Ignore failures to open external URLs
-      });
+    if (!isAllowedInAppUrl(nextUrl)) {
+      openHttpUrlExternally(nextUrl);
       return { action: "deny" };
     }
 
@@ -318,6 +382,30 @@ function attachPopupInjectionBehavior(targetWindow) {
       action: "allow",
       overrideBrowserWindowOptions: getPopupWindowOptions()
     };
+  });
+
+  targetWindow.webContents.on("will-navigate", (event, url) => {
+    if (isBlockedScriptUpdateUrl(url)) {
+      event.preventDefault();
+      return;
+    }
+
+    if (!isAllowedInAppUrl(url)) {
+      event.preventDefault();
+      openHttpUrlExternally(url);
+    }
+  });
+
+  targetWindow.webContents.on("will-redirect", (event, url) => {
+    if (isBlockedScriptUpdateUrl(url)) {
+      event.preventDefault();
+      return;
+    }
+
+    if (!isAllowedInAppUrl(url)) {
+      event.preventDefault();
+      openHttpUrlExternally(url);
+    }
   });
 
   targetWindow.webContents.on("did-create-window", (childWindow) => {
@@ -556,6 +644,8 @@ function openSettingsWindow() {
   settingsWindow = new BrowserWindow({
     width: 520,
     height: 520,
+    show: false,
+    backgroundColor: "#f3f7f4",
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -568,7 +658,26 @@ function openSettingsWindow() {
   });
 
   attachBrowserShortcutBehavior(settingsWindow);
-  settingsWindow.loadFile(path.join(__dirname, "settings.html"));
+  settingsWindow.once("ready-to-show", () => {
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      settingsWindow.show();
+    }
+  });
+
+  settingsWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription) => {
+    const escaped = String(errorDescription || "Unknown error")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    const html = `<!doctype html><html lang="zh-CN"><meta charset="UTF-8"><title>ELXMOJ 设置</title><body style="font-family:Segoe UI,Microsoft YaHei,sans-serif;padding:16px;background:#f3f7f4;color:#112015;"><h2 style="margin:0 0 8px;">设置页面加载失败</h2><p style="margin:0 0 8px;">请重试打开设置，或重启应用。</p><pre style="white-space:pre-wrap;background:#fff;border:1px solid #d8e3db;border-radius:8px;padding:8px;">${escaped} (code: ${errorCode})</pre></body></html>`;
+    settingsWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`).catch(() => {
+      // Ignore fallback load failures
+    });
+  });
+
+  settingsWindow.loadFile(SETTINGS_HTML_PATH).catch(() => {
+    // did-fail-load handler will present fallback content
+  });
   settingsWindow.on("closed", () => {
     settingsWindow = null;
   });

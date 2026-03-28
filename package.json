@@ -1,6 +1,6 @@
 {
   "name": "electro-xmoj",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "ELXMOJ Electron launcher with userscript updater",
   "main": "src/main.js",
   "homepage": "https://app.xmoj-bbs.me",
@@ -8,6 +8,7 @@
     "type": "git",
     "url": "https://github.com/XMOJ-Script-dev/ELXMOJ.git"
   },
+  "author": "XMOJ-Script-dev",
   "license": "GPL-3.0-or-later",
   "scripts": {
     "start": "electron .",
@@ -16,7 +17,7 @@
     "check:syntax": "node --check src/main.js && node --check src/preload.js && node --check src/settings.js && node --check src/storage.js && node --check src/updater.js",
     "check": "npm run lint && npm run check:syntax",
     "pack:win": "electron-builder --win nsis portable --publish never",
-    "pack:mac": "electron-builder --mac zip --publish never",
+    "pack:mac": "electron-builder --mac dmg zip --publish never",
     "pack:linux": "electron-builder --linux AppImage tar.gz --publish never"
   },
   "devDependencies": {
@@ -42,6 +43,10 @@
     ],
     "asar": true,
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
     "win": {
       "icon": "build/icons/app.ico",
       "target": [
@@ -52,8 +57,12 @@
     "mac": {
       "icon": "build/icons/app.png",
       "target": [
+        "dmg",
         "zip"
       ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "notarize": true,
       "category": "public.app-category.developer-tools"
     },
     "linux": {

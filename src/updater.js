@@ -7,9 +7,9 @@ function getChannelUrl(channel) {
   return channel === "preview" ? PREVIEW_URL : STABLE_URL;
 }
 
-function downloadText(url) {
+function downloadText(url, headers = {}) {
   return new Promise((resolve, reject) => {
-    const req = https.get(url, { timeout: 15000 }, (res) => {
+    const req = https.get(url, { timeout: 15000, headers }, (res) => {
       if (res.statusCode !== 200) {
         reject(new Error(`HTTP ${res.statusCode} while downloading ${url}`));
         res.resume();

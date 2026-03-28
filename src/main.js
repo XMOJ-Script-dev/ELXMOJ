@@ -42,8 +42,10 @@ let lastCheckResult = null;
 const LOCAL_SCRIPT_PATH = path.join(__dirname, "..", "XMOJ-Script", "XMOJ.user.js");
 const XMOJ_HOME = "https://www.xmoj.tech";
 const USER_SCRIPT_DEBUG_MODE_KEY = "UserScript-Setting-DebugMode";
-const APP_UPDATE_URL_TEMPLATE = "https://github.com/XMOJ-Script-dev/ELXMOJ/releases/download/v{version}/ELXMOJ-{version}.{ext}";
+const GITHUB_RELEASES_API = "https://api.github.com/repos/XMOJ-Script-dev/ELXMOJ/releases/latest";
+const GITHUB_RELEASES_PAGE = "https://github.com/XMOJ-Script-dev/ELXMOJ/releases/latest";
 const PRELOAD_PATH = path.join(__dirname, "preload.js");
+const SETTINGS_HTML_PATH = path.join(__dirname, "settings.html");
 const APP_ICON_PATH = path.join(
   __dirname,
   "..",
@@ -52,19 +54,48 @@ const APP_ICON_PATH = path.join(
   process.platform === "win32" ? "app.ico" : "app.png"
 );
 
-function getPlatformPackageExtension() {
-  if (process.platform === "win32") return "exe";
-  if (process.platform === "darwin") return "dmg";
-  if (process.platform === "linux") return "AppImage";
-  return "zip";
+function getPlatformAssetKeywords() {
+  if (process.platform === "win32") return { platform: "-win-", ext: ".exe" };
+  if (process.platform === "darwin") return { platform: "-mac-", ext: ".zip" };
+  if (process.platform === "linux") return { platform: "-linux-", ext: ".AppImage" };
+  return null;
 }
 
-function getAppUpdateUrl() {
-  const version = app.getVersion();
-  const ext = getPlatformPackageExtension();
-  return APP_UPDATE_URL_TEMPLATE
-    .replace("{version}", version)
-    .replace("{ext}", ext);
+async function getAppUpdateUrl() {
+  try {
+    const text = await downloadText(GITHUB_RELEASES_API, { "User-Agent": "ELXMOJ-App" });
+    const release = JSON.parse(text);
+    const assets = Array.isArray(release.assets) ? release.assets : [];
+    const keywords = getPlatformAssetKeywords();
+    if (keywords) {
+      const platformMatches = assets.filter(
+        (a) => {
+          const name = String(a.name);
+          return name.includes(keywords.platform) && name.endsWith(keywords.ext);
+        }
+      );
+      let asset = null;
+      if (platformMatches.length > 0) {
+        if (process.platform === "win32") {
+          // Prefer installer builds over portable when multiple Windows assets exist
+          asset =
+            platformMatches.find((a) => /nsis/i.test(String(a.name))) ||
+            platformMatches.find((a) => /setup/i.test(String(a.name))) ||
+            platformMatches.find((a) => /installer/i.test(String(a.name))) ||
+            platformMatches.find((a) => /portable/i.test(String(a.name))) ||
+            platformMatches[0];
+        } else {
+          asset = platformMatches[0];
+        }
+      }
+      if (asset?.browser_download_url) {
+        return asset.browser_download_url;
+      }
+    }
+  } catch (error) {
+    console.warn("[ELXMOJ] Failed to fetch latest release info:", error?.message || error);
+  }
+  return GITHUB_RELEASES_PAGE;
 }
 
 function getDebugModeFromChannel(channel) {
@@ -175,6 +206,87 @@ function getPopupWindowOptions() {
   };
 }
 
+function isBlockedScriptUpdateUrl(rawUrl) {
+  const urlText = String(rawUrl || "").trim();
+  if (!urlText) {
+    return false;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(urlText);
+  } catch {
+    return false;
+  }
+
+  const hostname = String(parsed.hostname || "").toLowerCase();
+  const pathname = String(parsed.pathname || "");
+  const normalizedPath = pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+
+  if (hostname === "api.github.com" && normalizedPath === "/repos/XMOJ-Script-dev/ELXMOJ/releases/latest") {
+    return true;
+  }
+
+  if (hostname === "github.com" && /^\/XMOJ-Script-dev\/ELXMOJ\/releases(\/latest)?$/i.test(normalizedPath)) {
+    return true;
+  }
+
+  if ((hostname === "xmoj-bbs.me" || hostname === "dev.xmoj-bbs.me") && /\/XMOJ\.user\.js$/i.test(normalizedPath)) {
+    return true;
+  }
+
+  return false;
+}
+
+function isAllowedInAppUrl(rawUrl) {
+  const urlText = String(rawUrl || "").trim();
+  if (!urlText) {
+    return false;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(urlText);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol === "file:" || parsed.protocol === "app:") {
+    return true;
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return false;
+  }
+
+  const hostname = String(parsed.hostname || "").toLowerCase();
+  if (!hostname) {
+    return false;
+  }
+
+  return hostname === "xmoj.tech" || hostname.endsWith(".xmoj.tech") || hostname === "116.62.212.172";
+}
+
+function openHttpUrlExternally(rawUrl) {
+  const urlText = String(rawUrl || "").trim();
+  if (!urlText) {
+    return;
+  }
+
+  try {
+    const parsed = new URL(urlText);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return;
+    }
+
+    shell.openExternal(urlText).catch(() => {
+      // Ignore failures to open external URLs
+    });
+  } catch {
+    // Ignore invalid URLs
+  }
+}
+
 function attachBrowserShortcutBehavior(targetWindow) {
   if (!targetWindow || targetWindow.isDestroyed()) {
     return;
@@ -257,30 +369,12 @@ function attachPopupInjectionBehavior(targetWindow) {
   targetWindow.webContents.setWindowOpenHandler(({ url }) => {
     const nextUrl = String(url || "");
 
-    let parsedTargetUrl;
-    try {
-      parsedTargetUrl = new URL(nextUrl);
-    } catch {
+    if (isBlockedScriptUpdateUrl(nextUrl)) {
       return { action: "deny" };
     }
 
-    if (parsedTargetUrl.protocol !== "http:" && parsedTargetUrl.protocol !== "https:") {
-      return { action: "deny" };
-    }
-
-    let trustedOrigin = "";
-    try {
-      trustedOrigin = new URL(XMOJ_HOME).origin;
-    } catch {
-      trustedOrigin = "";
-    }
-
-    const targetOrigin = parsedTargetUrl.origin;
-
-    if (!trustedOrigin || targetOrigin !== trustedOrigin) {
-      shell.openExternal(nextUrl).catch(() => {
-        // Ignore failures to open external URLs
-      });
+    if (!isAllowedInAppUrl(nextUrl)) {
+      openHttpUrlExternally(nextUrl);
       return { action: "deny" };
     }
 
@@ -288,6 +382,30 @@ function attachPopupInjectionBehavior(targetWindow) {
       action: "allow",
       overrideBrowserWindowOptions: getPopupWindowOptions()
     };
+  });
+
+  targetWindow.webContents.on("will-navigate", (event, url) => {
+    if (isBlockedScriptUpdateUrl(url)) {
+      event.preventDefault();
+      return;
+    }
+
+    if (!isAllowedInAppUrl(url)) {
+      event.preventDefault();
+      openHttpUrlExternally(url);
+    }
+  });
+
+  targetWindow.webContents.on("will-redirect", (event, url) => {
+    if (isBlockedScriptUpdateUrl(url)) {
+      event.preventDefault();
+      return;
+    }
+
+    if (!isAllowedInAppUrl(url)) {
+      event.preventDefault();
+      openHttpUrlExternally(url);
+    }
   });
 
   targetWindow.webContents.on("did-create-window", (childWindow) => {
@@ -458,10 +576,13 @@ function createMainMenu() {
       submenu: [
         {
           label: "下载最新版本",
-          click: () => {
-            shell.openExternal(getAppUpdateUrl()).catch(() => {
+          click: async () => {
+            try {
+              const url = await getAppUpdateUrl();
+              await shell.openExternal(url);
+            } catch {
               // Ignore failures to open update page
-            });
+            }
           }
         },
         { type: "separator" },
@@ -523,6 +644,8 @@ function openSettingsWindow() {
   settingsWindow = new BrowserWindow({
     width: 520,
     height: 520,
+    show: false,
+    backgroundColor: "#f3f7f4",
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -535,13 +658,32 @@ function openSettingsWindow() {
   });
 
   attachBrowserShortcutBehavior(settingsWindow);
-  settingsWindow.loadFile(path.join(__dirname, "settings.html"));
+  settingsWindow.once("ready-to-show", () => {
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      settingsWindow.show();
+    }
+  });
+
+  settingsWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription) => {
+    const escaped = String(errorDescription || "Unknown error")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    const html = `<!doctype html><html lang="zh-CN"><meta charset="UTF-8"><title>ELXMOJ 设置</title><body style="font-family:Segoe UI,Microsoft YaHei,sans-serif;padding:16px;background:#f3f7f4;color:#112015;"><h2 style="margin:0 0 8px;">设置页面加载失败</h2><p style="margin:0 0 8px;">请重试打开设置，或重启应用。</p><pre style="white-space:pre-wrap;background:#fff;border:1px solid #d8e3db;border-radius:8px;padding:8px;">${escaped} (code: ${errorCode})</pre></body></html>`;
+    settingsWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`).catch(() => {
+      // Ignore fallback load failures
+    });
+  });
+
+  settingsWindow.loadFile(SETTINGS_HTML_PATH).catch(() => {
+    // did-fail-load handler will present fallback content
+  });
   settingsWindow.on("closed", () => {
     settingsWindow = null;
   });
 }
 
-function buildSelfCheckReport({
+async function buildSelfCheckReport({
   hasManagedScript,
   localVersion,
   hasVersionMeta,
@@ -549,6 +691,7 @@ function buildSelfCheckReport({
   injectionReady,
   channel
 }) {
+  const appUpdateUrl = await getAppUpdateUrl();
   const lines = [
     "ELXMOJ 自检结果",
     "",
@@ -557,7 +700,7 @@ function buildSelfCheckReport({
     `更新源可访问: ${urlReachable ? "OK" : "失败"}`,
     `注入状态: ${injectionReady ? "已就绪" : "未就绪"}`,
     `更新通道: ${channel === "preview" ? "预览版" : "正式版"}`,
-    `App 更新下载: ${getAppUpdateUrl()}`
+    `App 更新下载: ${appUpdateUrl}`
   ];
   return lines.join("\n");
 }
@@ -579,7 +722,7 @@ async function runSelfCheck(showDialog = false) {
   const localVersion = extractVersion(localScript);
   const endpoint = await checkUpdateEndpoint(settings.channel);
 
-  const report = buildSelfCheckReport({
+  const report = await buildSelfCheckReport({
     hasManagedScript: Boolean(localScript && localScript.length > 0),
     localVersion,
     hasVersionMeta: Boolean(localVersion),
@@ -823,14 +966,14 @@ function registerIpcHandlers() {
     if (!isTrustedIpcSender(event)) {
       throw new Error("Unauthorized IPC sender");
     }
-    return getAppUpdateUrl();
+    return await getAppUpdateUrl();
   });
 
   ipcMain.handle("elxmoj:open-app-update-page", async (event) => {
     if (!isTrustedIpcSender(event)) {
       throw new Error("Unauthorized IPC sender");
     }
-    const url = getAppUpdateUrl();
+    const url = await getAppUpdateUrl();
     await shell.openExternal(url);
     return { ok: true, url };
   });

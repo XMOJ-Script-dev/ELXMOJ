@@ -42,7 +42,8 @@ let lastCheckResult = null;
 const LOCAL_SCRIPT_PATH = path.join(__dirname, "..", "XMOJ-Script", "XMOJ.user.js");
 const XMOJ_HOME = "https://www.xmoj.tech";
 const USER_SCRIPT_DEBUG_MODE_KEY = "UserScript-Setting-DebugMode";
-const APP_UPDATE_URL_TEMPLATE = "https://github.com/XMOJ-Script-dev/ELXMOJ/releases/download/v{version}/ELXMOJ-{version}.{ext}";
+const GITHUB_RELEASES_API = "https://api.github.com/repos/XMOJ-Script-dev/ELXMOJ/releases/latest";
+const GITHUB_RELEASES_PAGE = "https://github.com/XMOJ-Script-dev/ELXMOJ/releases/latest";
 const PRELOAD_PATH = path.join(__dirname, "preload.js");
 const APP_ICON_PATH = path.join(
   __dirname,
@@ -52,19 +53,31 @@ const APP_ICON_PATH = path.join(
   process.platform === "win32" ? "app.ico" : "app.png"
 );
 
-function getPlatformPackageExtension() {
-  if (process.platform === "win32") return "exe";
-  if (process.platform === "darwin") return "dmg";
-  if (process.platform === "linux") return "AppImage";
-  return "zip";
+function getPlatformAssetKeywords() {
+  if (process.platform === "win32") return { platform: "-win-", ext: ".exe" };
+  if (process.platform === "darwin") return { platform: "-mac-", ext: ".zip" };
+  if (process.platform === "linux") return { platform: "-linux-", ext: ".AppImage" };
+  return null;
 }
 
-function getAppUpdateUrl() {
-  const version = app.getVersion();
-  const ext = getPlatformPackageExtension();
-  return APP_UPDATE_URL_TEMPLATE
-    .replace("{version}", version)
-    .replace("{ext}", ext);
+async function getAppUpdateUrl() {
+  try {
+    const text = await downloadText(GITHUB_RELEASES_API, { "User-Agent": "ELXMOJ-App" });
+    const release = JSON.parse(text);
+    const assets = Array.isArray(release.assets) ? release.assets : [];
+    const keywords = getPlatformAssetKeywords();
+    if (keywords) {
+      const asset = assets.find(
+        (a) => String(a.name).includes(keywords.platform) && String(a.name).endsWith(keywords.ext)
+      );
+      if (asset?.browser_download_url) {
+        return asset.browser_download_url;
+      }
+    }
+  } catch (error) {
+    console.warn("[ELXMOJ] Failed to fetch latest release info:", error?.message || error);
+  }
+  return GITHUB_RELEASES_PAGE;
 }
 
 function getDebugModeFromChannel(channel) {
@@ -823,14 +836,14 @@ function registerIpcHandlers() {
     if (!isTrustedIpcSender(event)) {
       throw new Error("Unauthorized IPC sender");
     }
-    return getAppUpdateUrl();
+    return await getAppUpdateUrl();
   });
 
   ipcMain.handle("elxmoj:open-app-update-page", async (event) => {
     if (!isTrustedIpcSender(event)) {
       throw new Error("Unauthorized IPC sender");
     }
-    const url = getAppUpdateUrl();
+    const url = await getAppUpdateUrl();
     await shell.openExternal(url);
     return { ok: true, url };
   });

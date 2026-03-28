@@ -67,9 +67,26 @@ async function getAppUpdateUrl() {
     const assets = Array.isArray(release.assets) ? release.assets : [];
     const keywords = getPlatformAssetKeywords();
     if (keywords) {
-      const asset = assets.find(
-        (a) => String(a.name).includes(keywords.platform) && String(a.name).endsWith(keywords.ext)
+      const platformMatches = assets.filter(
+        (a) => {
+          const name = String(a.name);
+          return name.includes(keywords.platform) && name.endsWith(keywords.ext);
+        }
       );
+      let asset = null;
+      if (platformMatches.length > 0) {
+        if (process.platform === "win32") {
+          // Prefer installer builds over portable when multiple Windows assets exist
+          asset =
+            platformMatches.find((a) => /nsis/i.test(String(a.name))) ||
+            platformMatches.find((a) => /setup/i.test(String(a.name))) ||
+            platformMatches.find((a) => /installer/i.test(String(a.name))) ||
+            platformMatches.find((a) => /portable/i.test(String(a.name))) ||
+            platformMatches[0];
+        } else {
+          asset = platformMatches[0];
+        }
+      }
       if (asset?.browser_download_url) {
         return asset.browser_download_url;
       }

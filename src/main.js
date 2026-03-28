@@ -488,10 +488,13 @@ function createMainMenu() {
       submenu: [
         {
           label: "下载最新版本",
-          click: () => {
-            shell.openExternal(getAppUpdateUrl()).catch(() => {
+          click: async () => {
+            try {
+              const url = await getAppUpdateUrl();
+              await shell.openExternal(url);
+            } catch {
               // Ignore failures to open update page
-            });
+            }
           }
         },
         { type: "separator" },
@@ -571,7 +574,7 @@ function openSettingsWindow() {
   });
 }
 
-function buildSelfCheckReport({
+async function buildSelfCheckReport({
   hasManagedScript,
   localVersion,
   hasVersionMeta,
@@ -579,6 +582,7 @@ function buildSelfCheckReport({
   injectionReady,
   channel
 }) {
+  const appUpdateUrl = await getAppUpdateUrl();
   const lines = [
     "ELXMOJ 自检结果",
     "",
@@ -587,7 +591,7 @@ function buildSelfCheckReport({
     `更新源可访问: ${urlReachable ? "OK" : "失败"}`,
     `注入状态: ${injectionReady ? "已就绪" : "未就绪"}`,
     `更新通道: ${channel === "preview" ? "预览版" : "正式版"}`,
-    `App 更新下载: ${getAppUpdateUrl()}`
+    `App 更新下载: ${appUpdateUrl}`
   ];
   return lines.join("\n");
 }
@@ -609,7 +613,7 @@ async function runSelfCheck(showDialog = false) {
   const localVersion = extractVersion(localScript);
   const endpoint = await checkUpdateEndpoint(settings.channel);
 
-  const report = buildSelfCheckReport({
+  const report = await buildSelfCheckReport({
     hasManagedScript: Boolean(localScript && localScript.length > 0),
     localVersion,
     hasVersionMeta: Boolean(localVersion),

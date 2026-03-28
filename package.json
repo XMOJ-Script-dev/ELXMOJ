@@ -13,6 +13,7 @@
   "scripts": {
     "start": "electron .",
     "self-check": "electron . --self-check",
+    "build": "npm run check",
     "lint": "eslint src --ext .js",
     "check:syntax": "node --check src/main.js && node --check src/preload.js && node --check src/settings.js && node --check src/storage.js && node --check src/updater.js",
     "check": "npm run lint && npm run check:syntax",

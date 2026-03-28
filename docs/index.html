@@ -312,6 +312,47 @@
         margin-bottom: 24px;
       }
 
+      .dl-featured {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .dl-featured:empty {
+        display: none;
+      }
+
+      .dl-featured-link {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid var(--brand-mid);
+        background: linear-gradient(180deg, #f7fcf9 0%, #edf8f2 100%);
+        color: var(--text);
+        text-decoration: none;
+        transition: transform 0.12s, box-shadow 0.12s;
+      }
+
+      .dl-featured-link:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 20px rgba(10, 122, 79, 0.12);
+        text-decoration: none;
+      }
+
+      .dl-featured-title {
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .dl-featured-sub {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
       .dl-card {
         background: var(--card);
         border: 1px solid var(--line);
@@ -658,6 +699,7 @@
         <div class="section-label">下载</div>
         <h2 class="section-title">选择你的平台</h2>
         <p class="section-desc">从 GitHub Releases 获取最新版本，支持 Windows、macOS 和 Linux。</p>
+        <div class="dl-featured" id="dl-featured"></div>
         <div class="dl-grid" id="dl-grid">
           <div class="dl-loading">⏳ 正在加载最新版本信息…</div>
         </div>
@@ -676,7 +718,7 @@
             <div class="step-num">1</div>
             <div class="step-body">
               <h3>下载并安装</h3>
-              <p>根据操作系统选择对应的安装包，Windows 运行 <code>.exe</code> 安装程序，macOS 解压 <code>.zip</code>，Linux 使用 AppImage 或 tar.gz。</p>
+              <p>根据操作系统选择对应的安装包，Windows 运行 <code>.exe</code> 安装程序，macOS 推荐下载 <code>.dmg</code> 安装，Linux 使用 AppImage 或 tar.gz。</p>
             </div>
           </div>
           <div class="step">
@@ -728,11 +770,65 @@
 
         function classifyAsset(name) {
           const n = name.toLowerCase();
-          if (n.endsWith(".blockmap") || n.endsWith(".yml") || n.endsWith(".yaml")) return null;
+          if (
+            n.endsWith(".blockmap") ||
+            n.endsWith(".yml") ||
+            n.endsWith(".yaml") ||
+            n.endsWith(".json") ||
+            n.endsWith(".sha256") ||
+            n.endsWith(".sig")
+          ) {
+            return null;
+          }
           if (n.includes("win")) return { os: "win",   label: "Windows" };
           if (n.includes("mac") || n.includes("darwin")) return { os: "mac", label: "macOS"   };
           if (n.includes("linux")) return { os: "linux", label: "Linux"  };
           return null;
+        }
+
+        function isWindowsInstallerAsset(name) {
+          const n = String(name || "").toLowerCase();
+          return n.includes("win") && n.endsWith(".exe") && !n.includes("portable");
+        }
+
+        function isMacDmgAsset(name) {
+          const n = String(name || "").toLowerCase();
+          return (n.includes("mac") || n.includes("darwin")) && n.endsWith(".dmg");
+        }
+
+        function renderFeaturedDownloads(assets) {
+          const featured = document.getElementById("dl-featured");
+          if (!featured) return;
+
+          const winInstaller = assets.find(a => isWindowsInstallerAsset(a.name));
+          const macDmg = assets.find(a => isMacDmgAsset(a.name));
+          const links = [];
+
+          if (winInstaller) {
+            links.push(`
+              <a class="dl-featured-link" href="${winInstaller.browser_download_url}" target="_blank" rel="noopener">
+                <span>
+                  <span class="dl-featured-title">Windows 安装包下载</span><br />
+                  <span class="dl-featured-sub">${formatLabel(winInstaller.name)} · ${formatBytes(winInstaller.size)}</span>
+                </span>
+                <span>⬇</span>
+              </a>
+            `);
+          }
+
+          if (macDmg) {
+            links.push(`
+              <a class="dl-featured-link" href="${macDmg.browser_download_url}" target="_blank" rel="noopener">
+                <span>
+                  <span class="dl-featured-title">macOS dmg 下载</span><br />
+                  <span class="dl-featured-sub">${formatLabel(macDmg.name)} · ${formatBytes(macDmg.size)}</span>
+                </span>
+                <span>⬇</span>
+              </a>
+            `);
+          }
+
+          featured.innerHTML = links.join("");
         }
 
         function osIcon(os) {
@@ -749,6 +845,7 @@
 
         async function loadDownloads() {
           const grid = document.getElementById("dl-grid");
+          const featured = document.getElementById("dl-featured");
           const versionTag = document.getElementById("dl-version-tag");
 
           try {
@@ -757,9 +854,12 @@
             });
             if (!res.ok) throw new Error("HTTP " + res.status);
             const release = await res.json();
+            const assets = Array.isArray(release.assets) ? release.assets : [];
+
+            renderFeaturedDownloads(assets);
 
             const grouped = { win: [], mac: [], linux: [] };
-            for (const asset of release.assets || []) {
+            for (const asset of assets) {
               const info = classifyAsset(asset.name);
               if (info && grouped[info.os]) {
                 grouped[info.os].push(asset);
@@ -812,6 +912,9 @@
                 <a href="${RELEASES_PAGE}" target="_blank" rel="noopener">GitHub Releases</a>
                 下载最新版本。
               </div>`;
+            if (featured) {
+              featured.innerHTML = "";
+            }
           }
         }
 

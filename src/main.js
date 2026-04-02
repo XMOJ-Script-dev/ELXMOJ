@@ -1,5 +1,5 @@
 const path = require("node:path");
-const { app, BrowserWindow, dialog, ipcMain, Menu, net, session, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, session, shell } = require("electron");
 
 const {
   loadSettings,
@@ -624,11 +624,18 @@ function createMainWindow() {
     minHeight: 680,
     title: "ELXMOJ",
     icon: APP_ICON_PATH,
+    show: false,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#1a1a1a" : "#ffffff",
     webPreferences: createAppWebPreferences()
   });
 
   attachBrowserShortcutBehavior(mainWindow);
   attachPopupInjectionBehavior(mainWindow);
+  mainWindow.once("ready-to-show", () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+    }
+  });
   mainWindow.loadURL(XMOJ_HOME);
   mainWindow.on("closed", () => {
     mainWindow = null;

@@ -636,6 +636,35 @@ function createMainWindow() {
       mainWindow.show();
     }
   });
+  mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription) => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+    if (!mainWindow.isVisible()) {
+      mainWindow.show();
+    }
+    const escaped = String(errorDescription || "Unknown error")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    const safeCode = Number.isFinite(Number(errorCode)) ? Number(errorCode) : 0;
+    const isDark = nativeTheme.shouldUseDarkColors;
+    const bg = isDark ? "#1a1a1a" : "#f3f7f4";
+    const fg = isDark ? "#e8e8e8" : "#112015";
+    const cardBg = isDark ? "#2a2a2a" : "#fff";
+    const borderColor = isDark ? "#444" : "#d8e3db";
+    const html = [
+      `<!doctype html><html lang="zh-CN"><meta charset="UTF-8"><title>ELXMOJ</title>`,
+      `<body style="font-family:Segoe UI,Microsoft YaHei,sans-serif;padding:32px;background:${bg};color:${fg};">`,
+      `<h2 style="margin:0 0 8px;">页面加载失败</h2>`,
+      `<p style="margin:0 0 8px;">无法连接到 XMOJ，请检查网络后重试。</p>`,
+      `<pre style="white-space:pre-wrap;background:${cardBg};border:1px solid ${borderColor};border-radius:8px;padding:8px;">${escaped} (code: ${safeCode})</pre>`,
+      `</body></html>`
+    ].join("");
+    mainWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`).catch(() => {
+      // Ignore fallback load failures
+    });
+  });
   mainWindow.loadURL(XMOJ_HOME);
   mainWindow.on("closed", () => {
     mainWindow = null;

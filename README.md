@@ -1,5 +1,11 @@
 # ELXMOJ (Electron)
 
+> [!WARNING]
+> **ELXMOJ 已停止维护，仓库已归档。**
+>
+> 脚本迁移到 `xmoj-script.uk` 后，ELXMOJ 已无法正常更新脚本和使用讨论区等功能，后续也不会再修复。
+> 请改用浏览器 + 用户脚本管理器（如 Tampermonkey）安装 XMOJ-Script，见 [安装指南](https://docs.xmoj-script.uk/guide/installation)。
+
 在 Electron 中访问 `https://www.xmoj.tech`，自动加载 `XMOJ-Script/XMOJ.user.js`，并提供启动自检、脚本更新与设置持久化。
 
 ## 功能
